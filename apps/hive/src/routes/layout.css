@@ -1,0 +1,6 @@
+@import '@repo/ui/theme.css';
+@source "../../../../node_modules/flowbite-svelte/dist";
+
+body {
+    @apply mx-4 my-2;
+}

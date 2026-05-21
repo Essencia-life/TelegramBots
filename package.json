@@ -1,0 +1,27 @@
+{
+  "name": "TelegramBots",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "format": "prettier --write .",
+    "check-types": "turbo run check-types"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.5.0",
+    "postcss": "^8.5.15",
+    "prettier": "^3.8.1",
+    "prettier-plugin-svelte": "^3.5.1",
+    "tailwindcss": "^4.3.0",
+    "turbo": "^2.9.14"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "npm@11.9.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}

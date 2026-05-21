@@ -1,0 +1,54 @@
+@import url("https://fonts.googleapis.com/css2?family=Alegreya:wght@400;500;700&display=swap");
+@import "tailwindcss";
+@plugin "flowbite/plugin";
+
+@theme {
+  /* ─── Colors ──────────────q───────────── */
+
+  --color-primary: #677652;
+  --color-primary-50: #f5f7f3;
+  --color-primary-100: #e6ebdf;
+  --color-primary-200: #cfd8c5;
+  --color-primary-300: #b3c09f;
+  --color-primary-400: #8ea07a;
+  --color-primary-500: #677652;
+  --color-primary-600: #556245;
+  --color-primary-700: #445037;
+  --color-primary-800: #37402d;
+  --color-primary-900: #2d3425;
+
+  --color-accent: #60482f;
+
+  --color-background: #fcfaf4;
+  --color-surface: #f8f5ec;
+  --color-surface-soft: #e9e4d3;
+
+  --color-text: #312713;
+  --color-text-soft: #5e5548;
+
+  --color-forest: #3a4b39;
+  --color-amber: #c4922a;
+  --color-ocean: #4a7b8a;
+
+  /* ─── Typography ─────────────────────── */
+
+  --font-display: "Alegreya", serif;
+
+  --font-sans:
+    ui-sans-serif,
+    system-ui,
+    sans-serif;
+
+  /* ─── Radius ─────────────────────────── */
+
+  --radius-organic: 24px 8px 24px 8px;
+
+  /* ─── Shadows ────────────────────────── */
+
+  --shadow-soft:
+    0 4px 20px rgba(49, 39, 25, 0.06);
+
+  /* ─── Ease ───────────────────────────── */
+
+  --ease-organic: cubic-bezier(0.22, 1, 0.36, 1);
+}
