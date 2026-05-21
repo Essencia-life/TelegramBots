@@ -3,15 +3,43 @@
   "ui": "tui",
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".svelte-kit/**", ".vercel/**", "dist/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        ".env*"
+      ],
+      "outputs": [
+        ".svelte-kit/**",
+        ".vercel/**",
+        "dist/**"
+      ],
+      "env": [
+        "BOT_ADMIN_CHAT_ID",
+        "BOT_GROUP_CHAT_ID",
+        "BOT_SECRET_TOKEN",
+        "BOT_TOKEN",
+        "BOT_TOPIC_ID",
+        "CO_WORKING_CALENDAR_ID",
+        "GOOGLE_API_USER",
+        "GOOGLE_API_SUBJECT",
+        "GOOGLE_API_KEY",
+        "HIVE_CALENDAR_ID",
+        "PARAM_ENCRYPTION_KEY",
+        "KV_REST_API_URL",
+        "KV_REST_API_TOKEN"
+      ]
     },
     "lint": {
-      "dependsOn": ["^lint"]
+      "dependsOn": [
+        "^lint"
+      ]
     },
     "check-types": {
-      "dependsOn": ["^check-types"]
+      "dependsOn": [
+        "^check-types"
+      ]
     },
     "dev": {
       "cache": false,
