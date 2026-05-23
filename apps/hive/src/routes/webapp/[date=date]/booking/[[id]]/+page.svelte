@@ -182,7 +182,7 @@
 	}
 </script>
 
-<Modal open placement="bottom-center" title={params.id ? 'Update Booking' : 'New Booking'} onclose={() => history.back()}>
+<Modal open placement="bottom-center" class="rounded-b-none" title={params.id ? 'Update Booking' : 'New Booking'} onclose={() => history.back()}>
   <form id="booking" class="grid grid-cols-3 items-center gap-x-4 gap-y-2" {onsubmit}>
 	<Label for="booking-date">Date</Label>
 	<Input required type="date" id="booking-date" class="col-span-2" bind:value={date} min={today} />

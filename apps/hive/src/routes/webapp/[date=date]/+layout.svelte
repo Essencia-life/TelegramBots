@@ -149,8 +149,8 @@
 	});
 </script>
 
-<header class="sticky top-0 z-10 flex items-center justify-between h-16 bg-background mb-6">
-	<Button outline class="p-2! border-0" onclick={prevDay}>
+<header class="sticky top-0 z-10 mb-6 flex h-16 items-center justify-between bg-surface">
+	<Button outline class="border-0 p-2!" onclick={prevDay}>
 		<ChevronLeft />
 	</Button>
 	<label class="relative">
@@ -170,8 +170,12 @@
 					}
 				)}
 		/>
-		<Button outline class="border-0 rounded-none bg-background! relative" onclick={() => dateInput.showPicker()}>
-			<h2 class="text-2xl font-medium tracking-wide">
+		<Button
+			outline
+			class="relative rounded-none border-0 bg-surface!"
+			onclick={() => dateInput.showPicker()}
+		>
+			<h2 class="font-medium tracking-wide whitespace-nowrap">
 				{startOfDay
 					.toLocaleDateString('en-gb', {
 						day: '2-digit',
@@ -183,13 +187,16 @@
 			</h2>
 		</Button>
 	</label>
-	<Button outline class="p-2! border-0" onclick={nextDay}>
+	<Button outline class="border-0 p-2!" onclick={nextDay}>
 		<ChevronRight />
 	</Button>
 </header>
 
-<main class="calendar touch-pan-y" {@attach swipe({ threshold: 100, left: nextDay, right: prevDay })}>
-	<div class="column col-1 row-start-4 -row-end-1 text-gray-700 text-sm">
+<main
+	class="calendar touch-pan-y"
+	{@attach swipe({ threshold: 100, left: nextDay, right: prevDay })}
+>
+	<div class="column col-1! row-start-4! -row-end-1! text-sm text-gray-700">
 		{#each hours as hour}
 			<div class="row-span-4">
 				<time>{timeFormatter.format(new Date(startOfDay).setHours(hour))}</time>
@@ -208,7 +215,7 @@
 
 			<svelte:element
 				this={isOwn ? 'a' : 'div'}
-				class="bg-accent text-white rounded-lg p-2! mb-3 booking flex flex-col"
+				class="booking mb-3 flex flex-col rounded-lg bg-accent p-2! text-white"
 				class:small={isShortBooking(booking.start!.dateTime!, booking.end!.dateTime!)}
 				class:past={isPast(booking.end!.dateTime!)}
 				style:grid-row={timeToRows(booking.start!.dateTime!, booking.end!.dateTime!)}
@@ -226,12 +233,20 @@
 		{/each}
 
 		{#if startOfDay.getTime() < now.getTime() && now.getTime() < endOfDay.getTime()}
-			<div class="now border-2 border-amber pointer-events-none inset-x-0 absolute" style:--now={percent(now)} {@attach scrollIntoView}></div>
+			<div
+				class="now pointer-events-none absolute inset-x-0 border-t-2 border-amber"
+				style:--now={percent(now)}
+				{@attach scrollIntoView}
+			></div>
 		{/if}
 	</div>
 </main>
 
-<Button pill class="fixed right-4 bottom-4 p-2! w-12 h-12 text-xl" onclick={() => goto(resolve('/webapp/[date=date]/booking', params), { noScroll: true })}>
+<Button
+	pill
+	class="fixed right-4 bottom-4 h-12 w-12 p-2! text-xl"
+	onclick={() => goto(resolve('/webapp/[date=date]/booking', params), { noScroll: true })}
+>
 	<Plus />
 </Button>
 

@@ -52,3 +52,24 @@
 
   --ease-organic: cubic-bezier(0.22, 1, 0.36, 1);
 }
+
+@layer base {
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+  }
+
+  h1 {
+    font-size: var(--text-3xl);
+  }
+
+  h2 {
+    font-size: var(--text-2xl);
+  }
+
+  h3 {
+    font-size: var(--text-xl);
+  }
+}
