@@ -1,31 +1,31 @@
 @import '@repo/ui/theme.css';
-@source "../../../../node_modules/flowbite-svelte/dist";
+@source '../../../../node_modules/flowbite-svelte/dist';
 
 @layer base {
-    body {
-        @apply mx-4 my-2 bg-surface;
-    }
+	body {
+		@apply mx-4 my-2 bg-surface;
+	}
 
-    body {
-        @apply text-text;
-    }
+	body {
+		@apply text-text;
+	}
 
-    /* FIXME should be in theme */
-    h1,
-    h2,
-    h3 {
-        font-family: var(--font-display);
-    }
+	/* FIXME should be in theme */
+	h1,
+	h2,
+	h3 {
+		font-family: var(--font-display);
+	}
 
-    h1 {
-        font-size: var(--text-3xl);
-    }
+	h1 {
+		font-size: var(--text-3xl);
+	}
 
-    h2 {
-        font-size: var(--text-2xl);
-    }
+	h2 {
+		font-size: var(--text-2xl);
+	}
 
-    h3 {
-        font-size: var(--text-xl);
-    }
+	h3 {
+		font-size: var(--text-xl);
+	}
 }
