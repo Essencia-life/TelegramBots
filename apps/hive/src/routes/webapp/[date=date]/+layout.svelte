@@ -215,7 +215,7 @@
 
 			<svelte:element
 				this={isOwn ? 'a' : 'div'}
-				class="booking mb-3 flex flex-col rounded-lg bg-accent p-2! text-white"
+				class="booking flex flex-col rounded-lg bg-accent p-2! text-white"
 				class:small={isShortBooking(booking.start!.dateTime!, booking.end!.dateTime!)}
 				class:past={isPast(booking.end!.dateTime!)}
 				style:grid-row={timeToRows(booking.start!.dateTime!, booking.end!.dateTime!)}
