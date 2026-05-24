@@ -7,13 +7,13 @@
 		updateBooking
 	} from '$lib/calendar.remote';
 	import type { PageProps } from './$types';
-	import type { Attachment } from 'svelte/attachments';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { SvelteDate } from 'svelte/reactivity';
 	import ms from 'ms';
 	import type { TimePeriod } from '$lib/server/calendar';
 	import { Modal, Label, Input, Button } from 'flowbite-svelte';
+	import { page } from '$app/state';
 
 	const { params, data }: PageProps = $props();
 
@@ -31,7 +31,9 @@
 					minute: '2-digit',
 					timeZone: data.booking.start!.timeZone!
 				})
-			: ''
+			: page.url.searchParams.has('start')
+				? page.url.searchParams.get('start')
+				: ''
 	);
 	let endTime = $derived.by(() => {
 		if (data.booking?.end?.dateTime) {
@@ -182,39 +184,61 @@
 	}
 </script>
 
-<Modal open placement="bottom-center" class="rounded-b-none" title={params.id ? 'Update Booking' : 'New Booking'} onclose={() => history.back()}>
-  <form id="booking" class="grid grid-cols-3 items-center gap-x-4 gap-y-2" {onsubmit}>
-	<Label for="booking-date">Date</Label>
-	<Input required type="date" id="booking-date" class="col-span-2" bind:value={date} min={today} />
+<Modal
+	open
+	placement="bottom-center"
+	class="rounded-b-none"
+	title={params.id ? 'Update Booking' : 'New Booking'}
+	onclose={() => history.back()}
+>
+	<form id="booking" class="grid grid-cols-3 items-center gap-x-4 gap-y-2" {onsubmit}>
+		<Label for="booking-date">Date</Label>
+		<Input
+			required
+			type="date"
+			id="booking-date"
+			class="col-span-2"
+			bind:value={date}
+			min={today}
+		/>
 
-	<Label for="booking-start">Start time</Label>
-	<Input
-		required
-		type="time"
-		min={date === today ? nowTime : null}
-		id="booking-start" class="col-span-2"
-		{step}
-		bind:value={() => startTime, (time: string) => (startTime = roundValue(time))}
-	/>
+		<Label for="booking-start">Start time</Label>
+		<Input
+			required
+			type="time"
+			min={date === today ? nowTime : null}
+			id="booking-start"
+			class="col-span-2"
+			{step}
+			bind:value={() => startTime, (time: string) => (startTime = roundValue(time))}
+		/>
 
-	<Label for="booking-end">End time</Label>
-	<Input
-		required
-		type="time"
-		min={startTime}
-		id="booking-end" class="col-span-2"
-		{step}
-		bind:value={() => endTime, (time: string) => (endTime = roundValue(time))}
-	/>
+		<Label for="booking-end">End time</Label>
+		<Input
+			required
+			type="time"
+			min={startTime}
+			id="booking-end"
+			class="col-span-2"
+			{step}
+			bind:value={() => endTime, (time: string) => (endTime = roundValue(time))}
+		/>
 
-	<Label for="booking-reason">Reason</Label>
-	<Input required bind:value={description} autocapitalize="off" placeholder="e.g. Private Call" id="booking-reason" class="col-span-2"/>
-  </form>
+		<Label for="booking-reason">Reason</Label>
+		<Input
+			required
+			bind:value={description}
+			autocapitalize="off"
+			placeholder="e.g. Private Call"
+			id="booking-reason"
+			class="col-span-2"
+		/>
+	</form>
 
-  {#snippet footer()}
-	{#if params.id}
-		<Button color="red" class="w-full" onclick={confirmDeleteBooking}>Delete</Button>
-	{/if}
-	<Button type="submit" form="booking" color="primary" class="w-full" {loading}>Book</Button>
-  {/snippet}
+	{#snippet footer()}
+		{#if params.id}
+			<Button color="red" class="w-full" onclick={confirmDeleteBooking}>Delete</Button>
+		{/if}
+		<Button type="submit" form="booking" color="primary" class="w-full" {loading}>Book</Button>
+	{/snippet}
 </Modal>

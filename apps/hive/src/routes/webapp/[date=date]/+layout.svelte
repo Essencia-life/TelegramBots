@@ -204,8 +204,21 @@
 		{/each}
 	</div>
 	<div class="column">
-		{#each Array(24) as _}
-			<div class="row-span-4 rounded-lg bg-white"></div>
+		{#each Array(24) as _, hour}
+			<div class="row-span-4 grid grid-rows-4 rounded-lg bg-white">
+				{#each Array(4) as _, quarter}
+					{@const time = timeFormatter.format(new Date(startOfDay).setHours(hour, quarter * 15))}
+					<a
+						class="relative z-1"
+						aria-label={time}
+						href={resolve('/webapp/[date=date]/booking', {
+							date: params.date
+						}) +
+							'?start=' +
+							time}
+					></a>
+				{/each}
+			</div>
 		{/each}
 	</div>
 	<div class="column">
@@ -215,7 +228,7 @@
 
 			<svelte:element
 				this={isOwn ? 'a' : 'div'}
-				class="booking flex flex-col rounded-lg bg-accent p-2! text-white"
+				class="booking z-2 flex flex-col rounded-lg bg-accent p-2! text-white"
 				class:small={isShortBooking(booking.start!.dateTime!, booking.end!.dateTime!)}
 				class:past={isPast(booking.end!.dateTime!)}
 				style:grid-row={timeToRows(booking.start!.dateTime!, booking.end!.dateTime!)}
