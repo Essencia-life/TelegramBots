@@ -211,6 +211,7 @@
 					<a
 						class="relative z-1"
 						aria-label={time}
+						data-sveltekit-noscroll
 						href={resolve('/webapp/[date=date]/booking', {
 							date: params.date
 						}) +
