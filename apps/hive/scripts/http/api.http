@@ -1,0 +1,7 @@
+### Set up webhook
+
+PUT https://{{domain}}/api/telegram/webhook
+
+### Send agenda
+
+GET https://{{domain}}/api/telegram/agenda
