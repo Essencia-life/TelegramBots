@@ -63,6 +63,20 @@ export function errorHandlerCallback<C extends Context>(
   };
 }
 
+export function checkWebhookCallback(
+  bot: Bot
+): RequestHandler {
+  return async ({ url }) => {
+    const webhookInfo = await bot.api.getWebhookInfo();
+
+    if (url.toString() !== webhookInfo.url) {
+      error(404);
+    }
+
+    return new Response(null, { status: 204 });
+  };
+}
+
 export function setupWebhookCallback(
   bot: Bot,
   secretToken: string,
