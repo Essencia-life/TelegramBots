@@ -1,0 +1,173 @@
+:root {
+	--app-bg-color: var(--tg-theme-bg-color, #fff);
+	--app-text-color: var(--tg-theme-text-color, #333);
+	--app-hint-color: var(--tg-theme-hint-color, lightseagreen);
+	--app-link-color: var(--tg-theme-link-color, slateblue);
+	--app-button-color: var(--tg-theme-button-color, slateblue);
+	--app-button-text-color: var(--tg-theme-button-text-color, #fff);
+	--app-secondary-bg-color: var(--tg-theme-secondary-bg-color, #eee);
+	--app-header-bg-color: var(--tg-theme-header-bg-color, #ddd);
+	--app-bottom-bar-bg-color: var(--tg-theme-bottom-bar-bg-color, #fff);
+	--app-accent-text-color: var(--tg-theme-accent-text-color, slateblue);
+	--app-section-bg-color: var(--tg-theme-section-bg-color, #fff);
+	--app-section-header-text-color: var(--tg-theme-section-header-text-color, #333);
+	--app-section-separator-color: var(--tg-theme-section-separator-color, #ccc);
+	--app-subtitle-text-color: var(--tg-theme-subtitle-text-color, #666);
+	--app-destructive-text-color: var(--tg-theme-destructive-text-color, tomato);
+}
+
+html,
+body {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	margin: 0;
+	padding: 0;
+
+	font-family: 'Droid Sans', 'SF Pro', sans-serif;
+
+	background: var(--app-bg-color);
+	color: var(--app-text-color);
+
+	box-sizing: border-box;
+	overflow: hidden;
+}
+
+*,
+*::after,
+*::before {
+	box-sizing: inherit;
+}
+
+*:focus-visible {
+	outline: 0;
+}
+
+a,
+.link {
+	color: var(--app-link-color);
+}
+
+a.descructive,
+.link.descructive {
+	color: var(--app-destructive-text-color);
+}
+
+button {
+	display: inline-flex;
+	align-items: center;
+	padding: 0;
+	margin: 0;
+	border: 0;
+	font: inherit;
+	background: transparent;
+	vertical-align: middle;
+}
+
+button.button {
+	width: 100%;
+	padding: 12px;
+	border-radius: 8px;
+	font-weight: 500;
+	justify-content: center;
+}
+
+button.button+button.button {
+	margin-top: 8px;
+}
+
+button.button:not(.link) {
+	background: var(--app-button-color);
+	color: var(--app-button-text-color);
+}
+
+button.button:disabled {
+	filter: grayscale(80%);
+}
+
+dialog:not(.loader-dialog) {
+	display: flex;
+	flex-direction: column;
+	top: auto;
+	width: 100%;
+	height: auto;
+	max-width: 100%;
+	max-height: 100%;
+	padding: 32px 16px;
+	margin: 0;
+	gap: 32px;
+	background: var(--app-secondary-bg-color);
+	border-top-left-radius: 16px;
+	border-top-right-radius: 16px;
+	border: 0;
+	/* FIXME: transition behaves wrong */
+	transition:
+		0.3s opacity 0.2s ease,
+		transform 0.5s ease;
+}
+
+dialog:not(.loader):not([open]) {
+	opacity: 0;
+	transform: translateY(100%);
+}
+
+dialog::backdrop {
+	background-color: rgba(0 0 0 / 50%);
+	transition: 0.3 background-color 0.5s ease;
+}
+
+section header {
+	color: var(--app-section-header-text-color);
+	padding-bottom: 4px;
+	text-transform: uppercase;
+	font-size: 80%;
+}
+
+section header big {
+	font-size: 2em;
+	vertical-align: middle;
+	padding-right: 8px;
+}
+
+section ul {
+	list-style: none;
+	padding: 4px 16px;
+	margin: 0;
+	background: var(--app-section-bg-color);
+	border-radius: 12px;
+}
+
+li:not(:last-of-type) {
+	padding-bottom: 2px;
+	border-bottom: 1px solid var(--app-secondary-bg-color);
+	margin-bottom: 1px;
+}
+
+form section li>label {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+}
+
+form section li>label .required::after {
+	content: '*';
+	color: var(--app-destructive-text-color);
+	padding-left: 2px;
+}
+
+form section li input,
+form section li select {
+	appearance: none;
+	border: 0;
+	padding: 0;
+	font: inherit;
+	height: 40px;
+	text-align: right;
+	background: transparent;
+	color: var(--app-accent-text-color);
+}
+
+form section li input[list]::-webkit-calendar-picker-indicator,
+form section li input[list]::-webkit-list-button {
+	display: none !important;
+}

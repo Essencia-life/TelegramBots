@@ -19,7 +19,8 @@
         "HIVE_CALENDAR_ID",
         "PARAM_ENCRYPTION_KEY",
         "KV_REST_API_URL",
-        "KV_REST_API_TOKEN"
+        "KV_REST_API_TOKEN",
+        "DEBUG"
       ]
     },
     "lint": {

@@ -2,7 +2,7 @@ import { GrammyError, HttpError, type Bot, type Context, type ErrorHandler } fro
 import { error, type RequestHandler } from '@sveltejs/kit';
 import type { Update } from 'grammy/types';
 
-export function startDevServer(bot: Bot) {
+export function startDevServer<C extends Context>(bot: Bot<C>) {
   bot
     .start({
       onStart: async () => {
@@ -17,7 +17,7 @@ export function startDevServer(bot: Bot) {
 }
 
 export function errorHandlerCallback<C extends Context>(
-  bot: Bot,
+  bot: Bot<C>,
   adminChatId: string
 ): ErrorHandler<C> {
   return async (err) => {
@@ -63,9 +63,7 @@ export function errorHandlerCallback<C extends Context>(
   };
 }
 
-export function checkWebhookCallback(
-  bot: Bot
-): RequestHandler {
+export function checkWebhookCallback<C extends Context>(bot: Bot<C>): RequestHandler {
   return async ({ url }) => {
     const webhookInfo = await bot.api.getWebhookInfo();
 
@@ -77,8 +75,8 @@ export function checkWebhookCallback(
   };
 }
 
-export function setupWebhookCallback(
-  bot: Bot,
+export function setupWebhookCallback<C extends Context>(
+  bot: Bot<C>,
   secretToken: string,
   allowedUpdates: ReadonlyArray<Exclude<keyof Update, 'update_id'>>
 ): RequestHandler {

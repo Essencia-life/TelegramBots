@@ -1,5 +1,5 @@
 <script lang="ts">
-	import WebApp from '@twa-dev/sdk';
+	import * as WebApp from '@twa-dev/sdk';
 	import { onMount } from 'svelte';
 	import type { PageProps } from './$types';
 	import { page } from '$app/state';
