@@ -92,15 +92,11 @@ bot.on('chosen_inline_result', async (ctx) => {
 	await listService.addItem(categoryId, item);
 
 	const list = await listService.getList();
-	const { message_id } = await bot.api.sendMessage(
-		parseInt(BOT_GROUP_CHAT_ID),
-		shoppingList(list),
-		{
-			message_thread_id: parseInt(BOT_TOPIC_ID),
-			parse_mode: 'HTML',
-			reply_markup: inlineKeyboard
-		}
-	);
+	const { message_id } = await bot.api.sendMessage(BOT_GROUP_CHAT_ID, shoppingList(list), {
+		message_thread_id: parseInt(BOT_TOPIC_ID),
+		parse_mode: 'HTML',
+		reply_markup: inlineKeyboard
+	});
 
 	const lastMessageId = await lastMessageIdService.getId();
 	if (lastMessageId) {
@@ -159,15 +155,11 @@ export async function sendNewList() {
 	console.log('sendNewList');
 
 	const list = await listService.getList();
-	const { message_id } = await bot.api.sendMessage(
-		parseInt(BOT_GROUP_CHAT_ID),
-		shoppingList(list),
-		{
-			message_thread_id: parseInt(BOT_TOPIC_ID),
-			parse_mode: 'HTML',
-			reply_markup: inlineKeyboard
-		}
-	);
+	const { message_id } = await bot.api.sendMessage(BOT_GROUP_CHAT_ID, shoppingList(list), {
+		message_thread_id: parseInt(BOT_TOPIC_ID),
+		parse_mode: 'HTML',
+		reply_markup: inlineKeyboard
+	});
 
 	await lastMessageIdService.setId(message_id);
 }

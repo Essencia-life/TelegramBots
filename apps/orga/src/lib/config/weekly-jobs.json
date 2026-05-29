@@ -1,0 +1,229 @@
+{
+  "config": [
+    {
+      "type": "daily",
+      "calendar": "community",
+      "name": "meditation",
+      "title": "\uD83E\uDDD8\uFE0F Guided Meditation",
+      "description": "If no one signed up as meditation guide it will be a silent meditation",
+      "location": "Shala",
+      "startTime": {
+        "hour": 6,
+        "minute": 0
+      },
+      "endTime": {
+        "hour": 7,
+        "minute": 0
+      },
+      "weekdays": [
+        3,
+        5
+      ],
+      "jobs": [
+        {
+          "name": "guide",
+          "title": "Guided Meditation",
+          "persons": 1,
+          "askDetails": true
+        }
+      ]
+    },
+    {
+      "type": "daily",
+      "calendar": "community",
+      "name": "practice",
+      "title": "\uD83E\uDD38 Morning Practice",
+      "description": "",
+      "location": "Shala",
+      "startTime": {
+        "hour": 7,
+        "minute": 0
+      },
+      "endTime": {
+        "hour": 8,
+        "minute": 0
+      },
+      "weekdays": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "jobs": [
+        {
+          "name": "facilitator",
+          "title": "Morning Practice",
+          "persons": 1,
+          "askDetails": true
+        }
+      ]
+    },
+    {
+      "type": "daily",
+      "calendar": "community",
+      "name": "lunch",
+      "title": "\uD83E\uDD58\uFE0F Lunch",
+      "description": "<b>Lunch preparation begins at 11:00.</b>\nFrom this time until 13:00, you lovingly prepare the meal, tend to the dish-washing station and bring the kitchen back into a state of calm and cleanliness.\n\n<b>Lunch cleaning</b> means guiding the leftovers to their next resting place in the fridge and washing the pods and bowls in which the meal was shared.\n\n⚠\uFE0F Plates and cutlery find their way back to clarity through the hands of those who enjoyed the meal at the dish-washing station!\n\n<b>A meal costs 10€ per person per day</b>, unless you are volunteering or have offered 2 hours of service for Essência on that day.\n\uD83D\uDCD5\uFE0F Please write your name into the red lunch book and make your contribution at the end of the week (or on the day of your departure, if you leave earlier) to our Lakshmi fairy, <a href=\"tg://user?id=5637146678\">Eirune</a>.",
+      "location": "Forest SPA",
+      "startTime": {
+        "hour": 13,
+        "minute": 0
+      },
+      "endTime": {
+        "hour": 14,
+        "minute": 0
+      },
+      "weekdays": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "jobs": [
+        {
+          "name": "chef",
+          "title": "Lunch Chef",
+          "persons": 2
+        },
+        {
+          "name": "cleaning",
+          "title": "Lunch Cleaning",
+          "persons": 1
+        }
+      ]
+    },
+    {
+      "type": "daily",
+      "calendar": "events",
+      "name": "spa",
+      "title": "✨\uFE0F SPArkling Night",
+      "description": "Join us for a cozy, playful evening of warmth and connection. Enjoy the sauna and hot tub, jump into our natural pond, gather around the campfire and sing together under the night sky. A relaxed night to unwind, connect and let the day fade away.\n\n<b>Contribution is 20€.</b>",
+      "startTime": {
+        "hour": 18,
+        "minute": 0
+      },
+      "endTime": {
+        "hour": 22,
+        "minute": 0
+      },
+      "weekdays": [
+        4
+      ],
+      "jobs": [
+        {
+          "name": "pre_cleaning",
+          "title": "Pre SPA Cleaning",
+          "persons": 1
+        },
+        {
+          "name": "fire",
+          "title": "Fire Keeper",
+          "persons": 1
+        },
+        {
+          "name": "soup",
+          "title": "Soup Preparation",
+          "persons": 1
+        },
+        {
+          "name": "lakshmi",
+          "title": "Lakshmi Fairy",
+          "persons": 1
+        },
+        {
+          "name": "post_cleaning",
+          "title": "Post SPA Cleaning",
+          "persons": 1
+        }
+      ]
+    },
+    {
+      "type": "weekly",
+      "calendar": "community",
+      "name": "week-fairy",
+      "title": "\uD83E\uDDDA\u200D♀\uFE0F\uFE0F Fairy of the Week",
+      "description": "<u>Village Fairy</u>\nDescription is in the fun kitchen\n\n<u>Temple Fairy</u> <i>(Shala)</i>\n<ul><li>Broom inside and outside</li><li>Mop</li><li>Flowers</li><li>Clean Glass</li><li>Nice Altar</li><li>Make sure there is kleenex</li><li>Make sure yoga-mat-spray and microfibres are there</li><li>Smugging</li><li>No things lying around</li><li>Pellet stove works and is programmed</li><li>Water plant</li><li>Sofa nice</li><li>Use the robot in between</li>\n</ul>\n\n<u>Carpet Fairy</u>\n<ul><li>Take away and put carpets</li><li>Put them away after meetings/gatherings</li><li>Protect them from the rain</li>\n</ul>",
+      "jobs": [
+        {
+          "name": "village",
+          "title": "Village Fairy",
+          "persons": 2
+        },
+        {
+          "name": "temple",
+          "title": "Temple Fairy",
+          "persons": 1
+        },
+        {
+          "name": "carpet",
+          "title": "Carpet Fairy",
+          "persons": 1
+        }
+      ]
+    },
+    {
+      "type": "moon",
+      "calendar": "community",
+      "name": "forum",
+      "title": "\uD83C\uDF00 Forum",
+      "description": "A moderated group dialogue where one person at a time steps into the center (“the forum”) and speaks openly about what is alive for them—feelings, conflicts, desires, judgments, fears. The rest of the group listens attentively.\n\n<b>How it works</b>\n<ul><li>One person is in the center, supported by one or more trained facilitators.</li><li>The speaker is encouraged to move from stories and opinions to felt experience (emotions, body sensations,\tneeds).</li><li>The group does not interrupt, argue, or give advice unless explicitly invited.</li><li>The facilitator may challenge avoidance, unclear language, or social masks.</li><li>Others may later share brief reflections, usually as “how this affected me,” not evaluations.</li>\n</ul>\n\n<b>What it’s for</b>\n<ul><li>Making unspoken tensions visible before they turn toxic.</li><li>Resolving conflicts without blame or winner/loser dynamics.</li><li>Building emotional literacy and personal responsibility.</li><li>Strengthening community cohesion through radical transparency.</li>\n</ul>\n\n<b>What it is not</b>\n<ul><li>Not a debate.</li><li>Not group therapy, even if it can be emotionally intense.</li><li>Not about being “nice” or harmonious.</li><li>Not safe if facilitators are unskilled—this format needs competence.</li>\n</ul>",
+      "location": "Shala",
+      "startTime": {
+        "hour": 12,
+        "minute": 0
+      },
+      "endTime": {
+        "hour": 13,
+        "minute": 30
+      },
+      "weekday": 5,
+      "phase": "NEW_MOON",
+      "relation": "NOT_LAST_ON_OR_BEFORE",
+      "jobs": [
+        {
+          "name": "moderator",
+          "title": "Forum Moderator",
+          "persons": 1
+        }
+      ]
+    },
+    {
+      "type": "moon",
+      "calendar": "community",
+      "name": "innovations",
+      "title": "\uD83D\uDCA1 Innovations",
+      "description": "This meeting is a structured space for clarity and evolution within the community. It allows tensions to surface in a direct and constructive way, so they can become fuel for improvement instead of silent frustration.\n\nPlease come prepared. If tensions arise between meetings, write them down. Bring them with you. The more precise you are, the more effective the process becomes.\n\nWe begin in a round. Each person names one tension connected to the community. A tension can be anything that feels off, unclear, inefficient, or misaligned. We continue until no further tensions arise. All tensions are written down.\n\nAfterwards, we go through the list and ask who resonates with each point. The topics with the strongest resonance are addressed first, in that order.\n\nFor each selected tension, the tension owner presents a clear proposition — a concrete suggestion for how the issue could be handled or improved.\nThen we move into a clarification round. One by one, participants may ask questions if something in the proposition is unclear or if they sense something important may have been overlooked. This is not a discussion round, but a space to fully understand what is being proposed.\n\nOnce everything is clear, the group is asked: “Can you live with that?”\n\nIf everyone agrees, the decision stands and we move on to the next tension.\nIf someone cannot live with it, that person is invited to present a counter-proposition. The process then repeats: clarification, followed again by the question, “Can you live with that?”\n\nThe intention is not to seek perfection, but workable alignment. The meeting transforms friction into forward movement and gives innovation a clear structure.",
+      "location": "Hive",
+      "startTime": {
+        "hour": 12,
+        "minute": 0
+      },
+      "endTime": {
+        "hour": 13,
+        "minute": 30
+      },
+      "weekday": 5,
+      "phase": "NEW_MOON",
+      "relation": "LAST_ON_OR_BEFORE",
+      "jobs": [
+        {
+          "name": "moderator",
+          "title": "Innovations Moderator",
+          "persons": 1
+        },
+        {
+          "name": "timekeeper",
+          "title": "Innovations Time Keeper",
+          "persons": 1
+        },
+        {
+          "name": "writer",
+          "title": "Innovations Writer",
+          "persons": 1
+        }
+      ]
+    }
+  ]
+}
