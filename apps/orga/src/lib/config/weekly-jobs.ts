@@ -50,7 +50,7 @@ const jobsField: Field = {
 
 export default {
 	name: 'config',
-	file: 'src/lib/config/weekly-jobs.json',
+	file: 'apps/orga/src/lib/config/weekly-jobs.json',
 	label: 'Weekly Jobs',
 	fields: [
 		{

@@ -1,17 +1,17 @@
 <script>
-	import { init } from '@sveltia/cms';
 	import { resolve } from '$app/paths';
 	import weeklyJobs from '$lib/config/weekly-jobs';
 	import { onMount } from 'svelte';
 
-	onMount(() => {
-		init({
+	onMount(async () => {
+		const { init } = await import('@sveltia/cms');
+
+		void init({
 			config: {
 				backend: {
 					name: 'github',
 					repo: 'Essencia-life/TelegramBots',
 					branch: 'main',
-					base_url: 'https://essencia-cockpit.vercel.app',
 					auth_endpoint: resolve('/admin/auth'),
 					commit_messages: {
 						create: 'feat({{collection}}): created “{{slug}}”',
