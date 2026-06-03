@@ -23,7 +23,9 @@
         "PARAM_ENCRYPTION_KEY",
         "KV_REST_API_URL",
         "KV_REST_API_TOKEN",
-        "DEBUG"
+        "DEBUG",
+        "CMS_GITHUB_CLIENT_ID",
+        "CMS_GITHUB_CLIENT_SECRET"
       ]
     },
     "lint": {
