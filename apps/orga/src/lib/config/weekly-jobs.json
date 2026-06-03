@@ -144,7 +144,7 @@
       "calendar": "community",
       "name": "week-fairy",
       "title": "\uD83E\uDDDA\u200D♀\uFE0F\uFE0F Fairy of the Week",
-      "description": "<u>Village Fairy</u>\nDescription is in the fun kitchen\n\n<u>Temple Fairy</u> <i>(Shala)</i>\n<ul><li>Broom inside and outside</li><li>Mop</li><li>Flowers</li><li>Clean Glass</li><li>Nice Altar</li><li>Make sure there is kleenex</li><li>Make sure yoga-mat-spray and microfibres are there</li><li>Smugging</li><li>No things lying around</li><li>Pellet stove works and is programmed</li><li>Water plant</li><li>Sofa nice</li><li>Use the robot in between</li>\n</ul>\n\n<u>Carpet Fairy</u>\n<ul><li>Take away and put carpets</li><li>Put them away after meetings/gatherings</li><li>Protect them from the rain</li>\n</ul>",
+      "description": "<u>Village Fairy</u>\nDescription is in the fun kitchen\n\n<u>Temple Fairy</u> <i>(Shala)</i>\n<ul><li>Broom inside and outside</li><li>Mop</li><li>Flowers</li><li>Clean Glass</li><li>Nice Altar</li><li>Make sure there is kleenex</li><li>Make sure yoga-mat-spray and microfibres are there</li><li>Smugging</li><li>No things lying around</li><li>Pellet stove works and is programmed</li><li>Water plant</li><li>Sofa nice</li><li>Use the robot in between</li>\n</ul>\n\n<u>Carpet Jinn</u>\n<ul><li>Take away and put carpets</li><li>Put them away after meetings/gatherings</li><li>Protect them from the rain</li>\n</ul><u>Lord of Laundry</u>\n<ul><li>Once per week</li><li>Do the laundry of the kitchen towels and rugs and so on</li></ul>",
       "jobs": [
         {
           "name": "village",
@@ -158,7 +158,12 @@
         },
         {
           "name": "carpet",
-          "title": "Carpet Fairy",
+          "title": "Carpet Jinn \uD83E\uDDDE\u200D♂\uFE0F",
+          "persons": 1
+        },
+        {
+          "name": "laundry",
+          "title": "Lord of Laundry",
           "persons": 1
         }
       ]
