@@ -16,11 +16,12 @@
 		sendNewList
 	} from '$lib/remote/list.remote';
 	import { fractionMapping } from '$lib/utils';
-	import Checkbox from '$lib/components/Checkbox.svelte';
+	// import Checkbox from '$lib/components/Checkbox.svelte';
 	import Plus from '@lucide/svelte/icons/plus';
 	import webAppDataService from '$lib/client/web-app-data.service';
 	import { on } from 'svelte/events';
 	import Loader from '$lib/components/Loader.svelte';
+	import { Listgroup, ListgroupItem, Checkbox } from 'flowbite-svelte';
 
 	interface Props {
 		children: Snippet;
@@ -145,46 +146,36 @@
 	{/if}
 {/snippet}
 
-<header class="main">
-	<img class="avatar" src="/api/telegram/avatar" alt="Shopping List" />
-</header>
-
 <main>
 	{#each await getList() as category (category.id)}
 		<section>
 			<header><big>{category.emoji}</big>{category.label}</header>
-			<ul>
+			<Listgroup active>
 				{#each category.items as item (item.id)}
-					<li>
-						<Checkbox
-							checked={item.checked}
-							ontap={() => checkItem(item)}
-							onlongpress={() => openItem(category, item)}
-						>
-							<span class="label">{item.label}</span>
-							{#snippet trailing()}
-								{#if item.amount}
-									<span class="tag">
-										{fractionMapping.get(item.amount) ?? item.amount}&hairsp;{item.unit ?? '\u00D7'}
-									</span>
-								{/if}
-								{#if item.personal}
-									{@render mention(item.added.by)}
-								{/if}
-							{/snippet}
+					<ListgroupItem class="h-10 items-center py-0!">
+						<Checkbox class="h-5 w-5 rounded-full bg-size-[1.25em]!" checked={item.checked}>
+							{item.label}
 						</Checkbox>
-					</li>
+						<div class="ml-auto">
+							{#if item.amount}
+								<span class="tag">
+									{fractionMapping.get(item.amount) ?? item.amount}&hairsp;{item.unit ?? '\u00D7'}
+								</span>
+							{/if}
+							{#if item.personal}
+								{@render mention(item.added.by)}
+							{/if}
+						</div>
+					</ListgroupItem>
 				{/each}
-				<li>
-					<a
-						class="link"
-						href={resolve('/webapp/item/[categoryId=uuid]', { categoryId: category.id })}
-					>
-						<Plus strokeWidth={1.5} />
-						Add Item
-					</a>
-				</li>
-			</ul>
+				<a
+					class="link"
+					href={resolve('/webapp/item/[categoryId=uuid]', { categoryId: category.id })}
+				>
+					<Plus strokeWidth={1.5} />
+					Add Item
+				</a>
+			</Listgroup>
 		</section>
 	{:else}
 		<p>
@@ -212,18 +203,7 @@
 		overflow: auto;
 	}
 
-	header.main {
-		display: flex;
-	}
-
-	header.main img {
-		margin: 8px auto;
-		border-radius: 100%;
-		height: 64px;
-		width: 64px;
-	}
-
-	li .tag {
+	.tag {
 		padding: 2px 6px;
 		font-size: 80%;
 		border-radius: 8px;
@@ -231,7 +211,7 @@
 		color: var(--app-bg-color);
 	}
 
-	li .tag.personal {
+	.tag.personal {
 		background: var(--app-link-color);
 		color: var(--app-bg-color);
 		text-decoration: none;
