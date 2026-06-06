@@ -1,2 +1,33 @@
 @import '@repo/ui/theme.css';
 @source '../../../../node_modules/flowbite-svelte/dist';
+
+@layer base {
+
+	html,
+	body {
+		@apply h-full;
+	}
+
+	body {
+		@apply m-4 flex min-h-0 flex-col overflow-hidden bg-surface text-text dark:bg-gray-900 dark:text-gray-400;
+	}
+
+	/* FIXME should be in theme */
+	h1,
+	h2,
+	h3 {
+		@apply font-display text-accent dark:text-accent-300;
+	}
+
+	h1 {
+		font-size: var(--text-3xl);
+	}
+
+	h2 {
+		font-size: var(--text-2xl);
+	}
+
+	h3 {
+		font-size: var(--text-xl);
+	}
+}

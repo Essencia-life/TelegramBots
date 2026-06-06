@@ -2,10 +2,10 @@
 	import EmojiRegex from 'emoji-regex-xs';
 	import { dialogOpen } from '$lib/attachments/dialogOpen';
 	import { getContext } from 'svelte';
-	import { getList } from '$lib/remote/list.remote';
-	import { deleteCategory, updateCategory } from '$lib/remote/category.remote';
+	import { getList } from '../../../list.remote';
+	import { deleteCategory, updateCategory } from './category.remote';
 	import { page } from '$app/state';
-	import WebApp from '@twa-dev/sdk';
+	import WebApp from '$lib/webapp';
 
 	let dialogRef: HTMLDialogElement;
 

@@ -32,3 +32,5 @@ http-client.env.json
 .turbo
 
 dist
+.vercel
+.env*

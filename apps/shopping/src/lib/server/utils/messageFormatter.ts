@@ -50,4 +50,3 @@ function category(category: Category) {
 export function shoppingList(list: List): string {
 	return list.reduce(formatAs(category), '');
 }
-

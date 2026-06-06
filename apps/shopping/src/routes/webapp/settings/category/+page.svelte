@@ -2,8 +2,8 @@
 	import EmojiRegex from 'emoji-regex-xs';
 	import { dialogOpen } from '$lib/attachments/dialogOpen';
 	import { getContext } from 'svelte';
-	import { getList } from '$lib/remote/list.remote';
-	import { createCategory } from '$lib/remote/category.remote';
+	import { getList } from '../../list.remote';
+	import { createCategory } from './[categoryId=uuid]/category.remote';
 
 	let dialogRef: HTMLDialogElement;
 

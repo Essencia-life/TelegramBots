@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Plus from '@lucide/svelte/icons/plus';
 	import { dialogOpen } from '$lib/attachments/dialogOpen';
-	import { getList } from '$lib/remote/list.remote';
+	import { getList } from '../list.remote';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import type { Snippet } from 'svelte';

@@ -1,11 +1,13 @@
-import type { UUID } from "crypto";
+import type { UUID } from 'crypto';
+
+export interface User {
+	id: number;
+	name: string;
+	username?: string;
+}
 
 export interface UserAction {
-	by: {
-		id: number;
-		name: string;
-		username?: string;
-	};
+	by: User;
 	at: Date;
 }
 
@@ -25,6 +27,7 @@ export interface Category {
 	label: string;
 	emoji: string;
 	items: Item[];
+	collapsed?: boolean;
 }
 
 export type List = Category[];

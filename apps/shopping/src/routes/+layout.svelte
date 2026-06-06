@@ -1,7 +1,7 @@
 <script>
-  import './layout.css';
+	import './layout.css';
 
-  const { children } = $props();
+	const { children } = $props();
 </script>
 
 {@render children()}

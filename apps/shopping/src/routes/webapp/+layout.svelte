@@ -1,27 +1,23 @@
 <script lang="ts">
-	import './+layout.css';
-
-	import WebApp from '@twa-dev/sdk';
-	import type { Category, Item, UserAction } from '$lib/schema';
-	import { onDestroy, onMount, setContext, type Snippet } from 'svelte';
+	import WebApp from '$lib/webapp';
+	import type { Category, UserAction } from '$lib/schema';
+	import { onDestroy, onMount, type Snippet } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import {
-		checkListItem,
-		clearLists,
-		completeList,
-		deleteCheckedListItems,
-		getList,
-		sendNewList
-	} from '$lib/remote/list.remote';
+	import { checkListItem, getList } from './list.remote';
 	import { fractionMapping } from '$lib/utils';
-	// import Checkbox from '$lib/components/Checkbox.svelte';
 	import Plus from '@lucide/svelte/icons/plus';
-	import webAppDataService from '$lib/client/web-app-data.service';
+	import GripVertical from '@lucide/svelte/icons/grip-vertical';
+	import ChevronsDownUp from '@lucide/svelte/icons/chevrons-down-up';
+	import ChevronsUpDown from '@lucide/svelte/icons/chevrons-up-down';
+	import ShieldAlert from '@lucide/svelte/icons/shield-alert';
 	import { on } from 'svelte/events';
-	import Loader from '$lib/components/Loader.svelte';
-	import { Listgroup, ListgroupItem, Checkbox } from 'flowbite-svelte';
+	import { Spinner, Listgroup, ListgroupItem, Badge, Button } from 'flowbite-svelte';
+	import { login } from './login.remote';
+	import AsyncCheckbox from './AsyncCheckbox.svelte';
+	import { flip } from 'svelte/animate';
+	import { slide } from 'svelte/transition';
 
 	interface Props {
 		children: Snippet;
@@ -29,26 +25,20 @@
 
 	const { children }: Props = $props();
 
-	let loader: Loader;
 	let refreshIntervalInstance: number;
 
-	setContext('loader', {
-		show() {
-			loader.show();
-		},
-		hide() {
-			loader.hide();
-		}
-	});
+	let loginPromise: Promise<void> | undefined = $state();
 
 	onMount(() => {
 		console.log(WebApp);
 
-		WebApp.SettingsButton.show().onClick(() => {
+		loginPromise = login(WebApp.initData);
+
+		WebApp.SettingsButton?.show().onClick(() => {
 			goto(resolve('/webapp/settings'));
 		});
 
-		WebApp.BackButton.onClick(() => {
+		WebApp.BackButton?.onClick(() => {
 			history.back();
 		});
 
@@ -73,7 +63,7 @@
 	});
 
 	$effect(() => {
-		WebApp.BackButton[page.route.id === '/webapp' ? 'hide' : 'show']();
+		WebApp.BackButton?.[page.route.id === '/webapp' ? 'hide' : 'show']();
 	});
 
 	function refreshInterval() {
@@ -81,152 +71,125 @@
 	}
 
 	async function completeListConfirm() {
-		const list = await getList();
-		const completeConfirmed = await new Promise((resolve) =>
-			WebApp.showConfirm('Complete shopping list?', resolve)
-		);
-
-		if (!completeConfirmed) {
-			return;
-		}
-
-		if (list.some((category) => category.items.some((item) => !item.checked))) {
-			const newList = await new Promise((resolve) =>
-				WebApp.showConfirm('Move open items to new list?', resolve)
-			);
-
-			if (newList) {
-				await completeList(true);
-				await deleteCheckedListItems();
-				await sendNewList();
-
-				WebApp.close();
-				return;
-			}
-		}
-
-		await completeList(false);
-		await clearLists();
-
-		WebApp.close();
+		// 	const list = await getList();
+		// 	const completeConfirmed = await new Promise((resolve) =>
+		// 		WebApp.showConfirm('Complete shopping list?', resolve)
+		// 	);
+		// 	if (!completeConfirmed) {
+		// 		return;
+		// 	}
+		// 	if (list.some((category) => category.items.some((item) => !item.checked))) {
+		// 		const newList = await new Promise((resolve) =>
+		// 			WebApp.showConfirm('Move open items to new list?', resolve)
+		// 		);
+		// 		if (newList) {
+		// 			await completeList(true);
+		// 			await deleteCheckedListItems();
+		// 			await sendNewList();
+		// 			WebApp.close();
+		// 			return;
+		// 		}
+		// 	}
+		// 	await completeList(false);
+		// 	await clearLists();
+		// 	WebApp.close();
 	}
 
-	async function checkItem(item: Item) {
-		const { id, first_name: name, username } = await webAppDataService.getUser();
-		const userAction: UserAction | undefined = {
-			at: new Date(),
-			by: { id, name, username }
-		};
-
-		await checkListItem({
-			itemId: item.id,
-			userAction
-		});
-
-		await getList().refresh();
-	}
-
-	function openItem(category: Category, item: Item) {
-		navigator.vibrate(50);
-
-		goto(
-			resolve('/webapp/item/[categoryId=uuid]/[itemId=uuid]', {
-				categoryId: category.id,
-				itemId: item.id
-			})
-		);
+	function toggleCategory(category: Category) {
+		// FIXME: doesn't work
+		category.collapsed = !category.collapsed;
 	}
 </script>
 
 {#snippet mention(user: UserAction['by'])}
 	{#if user.username}
-		<a class="tag personal" href="https://t.me/{user.username}">@{user.name}</a>
+		<Badge color="amber" href="https://t.me/{user.username}">@{user.name}</Badge>
 	{:else}
-		@{user.name}
+		<Badge color="amber">@{user.name}</Badge>
 	{/if}
 {/snippet}
 
-<main>
-	{#each await getList() as category (category.id)}
-		<section>
-			<header><big>{category.emoji}</big>{category.label}</header>
-			<Listgroup active>
-				{#each category.items as item (item.id)}
-					<ListgroupItem class="h-10 items-center py-0!">
-						<Checkbox class="h-5 w-5 rounded-full bg-size-[1.25em]!" checked={item.checked}>
-							{item.label}
-						</Checkbox>
-						<div class="ml-auto">
-							{#if item.amount}
-								<span class="tag">
-									{fractionMapping.get(item.amount) ?? item.amount}&hairsp;{item.unit ?? '\u00D7'}
-								</span>
-							{/if}
-							{#if item.personal}
-								{@render mention(item.added.by)}
-							{/if}
+{#await loginPromise}
+	<div class="flex h-full flex-col items-center justify-center gap-8">
+		<Spinner size="16" />
+		Logging in...
+	</div>
+{:then _}
+	<main class="mt-2 flex flex-1 flex-col gap-4 overflow-auto">
+		{#each await getList() as category (category.id)}
+			<section>
+				<h2 class="m-1 flex items-center gap-2">
+					<span>{category.emoji}</span>
+					{category.label}
+					<button class="ml-auto text-primary" onclick={() => toggleCategory(category)}>
+						{#if category.collapsed}
+							<ChevronsUpDown size={20} />
+						{:else}
+							<ChevronsDownUp size={20} />
+						{/if}
+					</button>
+				</h2>
+				<Listgroup active>
+					{#each category.items as item (item.id)}
+						<div animate:flip={{ duration: 300 }} transition:slide={{ duration: 500 }}>
+							<ListgroupItem class="h-10 items-center py-0 pr-1">
+								<AsyncCheckbox checked={item.checked} action={() => checkListItem(item.id)} />
+								<a
+									class="overflow-hidden text-ellipsis whitespace-nowrap"
+									href={resolve('/webapp/item/[categoryId=uuid]/[[itemId=uuid]]', {
+										categoryId: category.id,
+										itemId: item.id
+									})}
+									data-sveltekit-noscroll
+								>
+									{item.label}
+								</a>
+								<div class="ml-auto flex shrink-0 items-center gap-1">
+									{#if item.personal}
+										{@render mention(item.added.by)}
+									{/if}
+									{#if item.amount}
+										<Badge>
+											{fractionMapping.get(item.amount) ?? item.amount}&hairsp;{item.unit ||
+												'\u00D7'}
+										</Badge>
+									{/if}
+									<button class="text-gray-200 dark:text-gray-600" class:invisible={item.checked}>
+										<!-- TODO: implement https://github.com/isaacHagoel/svelte-dnd-action#drag-handles-support -->
+										<GripVertical />
+									</button>
+								</div>
+							</ListgroupItem>
 						</div>
+					{/each}
+					<ListgroupItem class="h-10 items-center py-0 pl-3.25">
+						<a
+							class="flex items-center gap-4 text-primary"
+							href={resolve('/webapp/item/[categoryId=uuid]', { categoryId: category.id })}
+							data-sveltekit-noscroll
+						>
+							<Plus strokeWidth={1.5} />
+							Add Item
+						</a>
 					</ListgroupItem>
-				{/each}
-				<a
-					class="link"
-					href={resolve('/webapp/item/[categoryId=uuid]', { categoryId: category.id })}
-				>
-					<Plus strokeWidth={1.5} />
-					Add Item
-				</a>
-			</Listgroup>
-		</section>
-	{:else}
-		<p>
-			There are no lists available.<br />
-			Go to <a href={resolve('/webapp/settings')}>settings</a> to create new lists.
-		</p>
-	{/each}
-</main>
-<div class="bottom-bar">
-	<button class="button" onclick={completeListConfirm}>Complete Shopping List</button>
-</div>
+				</Listgroup>
+			</section>
+		{:else}
+			<p>
+				There are no lists available.<br />
+				Go to <a href={resolve('/webapp/settings')}>settings</a> to create new lists.
+			</p>
+		{/each}
+	</main>
 
-{@render children?.()}
+	<div class="py-3">
+		<Button class="w-full" onclick={completeListConfirm}>Complete Shopping List</Button>
+	</div>
 
-<Loader bind:this={loader} />
-
-<style>
-	main {
-		display: flex;
-		flex-direction: column;
-		flex: 1;
-		padding: 16px;
-		gap: 16px;
-		background: var(--app-secondary-bg-color);
-		overflow: auto;
-	}
-
-	.tag {
-		padding: 2px 6px;
-		font-size: 80%;
-		border-radius: 8px;
-		background: var(--app-accent-text-color);
-		color: var(--app-bg-color);
-	}
-
-	.tag.personal {
-		background: var(--app-link-color);
-		color: var(--app-bg-color);
-		text-decoration: none;
-	}
-
-	a.link {
-		display: flex;
-		height: 40px;
-		align-items: center;
-		gap: 8px;
-		text-decoration: none;
-	}
-
-	.bottom-bar {
-		padding: 16px;
-		background: var(--app-bottom-bar-bg-color);
-	}
-</style>
+	{@render children?.()}
+{:catch error}
+	<div class="flex h-full flex-col items-center justify-center gap-8 text-red-600">
+		<ShieldAlert size={64} />
+		Error: {error.body.message}
+	</div>
+{/await}
