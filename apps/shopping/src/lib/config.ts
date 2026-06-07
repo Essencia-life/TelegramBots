@@ -1,0 +1,17 @@
+export const units = [
+    '\u00D7',
+    'g',
+    'kg',
+    'ml',
+    'l',
+    'bag',
+    'bags',
+    'head',
+    'heads',
+    'crate',
+    'crates',
+    'jar',
+    'jars',
+    'bottle',
+    'bottles',
+];

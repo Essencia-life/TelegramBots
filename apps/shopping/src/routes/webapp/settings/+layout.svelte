@@ -1,11 +1,10 @@
 <script lang="ts">
-	import Plus from '@lucide/svelte/icons/plus';
-	import { dialogOpen } from '$lib/attachments/dialogOpen';
 	import { getList } from '../list.remote';
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import type { Snippet } from 'svelte';
-	import type { UUID } from 'node:crypto';
+	import { Modal, Listgroup, ListgroupItem } from 'flowbite-svelte';
+	import Plus from '@lucide/svelte/icons/plus';
+	import GripVertical from '@lucide/svelte/icons/grip-vertical';
 
 	interface Props {
 		children: Snippet;
@@ -14,57 +13,39 @@
 	const { children }: Props = $props();
 </script>
 
-<dialog {@attach dialogOpen} class="settings" onclose={() => history.back()}>
-	<section>
-		<header>Categories</header>
-		<ul>
-			{#each await getList() as category}
-				<li>
-					<button
-						class="link"
-						onclick={() =>
-							goto(
-								resolve('/webapp/settings/category/[categoryId=uuid]', {
-									categoryId: category.id as UUID
-								})
-							)}
-					>
-						<div class="emoji">{category.emoji}</div>
-						{category.label}
-					</button>
-				</li>
-			{/each}
-			<li>
-				<button class="link" onclick={() => goto(resolve('/webapp/settings/category'))}>
-					<Plus />
-					Add Category
+<Modal
+	open
+	title="Settings"
+	placement="bottom-center"
+	class="rounded-b-none"
+	onclose={() => history.back()}
+>
+	<h4>Categories</h4>
+	<Listgroup active>
+		{#each await getList() as category}
+			<ListgroupItem
+				href={resolve('/webapp/settings/category/[[categoryId=uuid]]', {
+					categoryId: category.id
+				})}
+				data-sveltekit-noscroll
+				class="h-10 items-center py-0 pr-1"
+			>
+				<div class="text-lg">{category.emoji}</div>
+				{category.label}
+				<button class="ml-auto text-gray-200 dark:text-gray-600">
+					<!-- TODO: implement https://github.com/isaacHagoel/svelte-dnd-action#drag-handles-support -->
+					<GripVertical />
 				</button>
-			</li>
-		</ul>
-	</section>
-</dialog>
+			</ListgroupItem>
+		{/each}
+		<ListgroupItem
+			class="h-10 items-center py-0 pl-3.25"
+			href={resolve('/webapp/settings/category')}
+		>
+			<Plus strokeWidth={1.5} />
+			Add Category
+		</ListgroupItem>
+	</Listgroup>
+</Modal>
 
 {@render children?.()}
-
-<style>
-	ul {
-		margin-block: 16px;
-	}
-
-	button.link {
-		appearance: none;
-		display: flex;
-		height: 40px;
-		width: 100%;
-		align-items: center;
-		gap: 8px;
-		border: 0;
-		padding: 0;
-		font: inherit;
-		text-align: left;
-	}
-
-	button .emoji {
-		font-size: 24px;
-	}
-</style>

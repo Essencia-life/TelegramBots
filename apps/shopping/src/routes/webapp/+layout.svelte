@@ -1,6 +1,6 @@
 <script lang="ts">
 	import WebApp from '$lib/webapp';
-	import type { Category, UserAction } from '$lib/schema';
+	import type { UserAction } from '$lib/schema';
 	import { onDestroy, onMount, type Snippet } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -14,10 +14,10 @@
 	import ShieldAlert from '@lucide/svelte/icons/shield-alert';
 	import { on } from 'svelte/events';
 	import { Spinner, Listgroup, ListgroupItem, Badge, Button } from 'flowbite-svelte';
-	import { login } from './login.remote';
 	import AsyncCheckbox from './AsyncCheckbox.svelte';
 	import { flip } from 'svelte/animate';
 	import { slide } from 'svelte/transition';
+	import ms from 'ms';
 
 	interface Props {
 		children: Snippet;
@@ -29,10 +29,17 @@
 
 	let loginPromise: Promise<void> | undefined = $state();
 
-	onMount(() => {
+	onMount(async () => {
 		console.log(WebApp);
 
-		loginPromise = login(WebApp.initData);
+		if (WebApp.initData) {
+			await cookieStore.set({
+				name: 'session',
+				value: WebApp.initData,
+				expires: WebApp.initDataUnsafe.auth_date * 1000 + ms('1d'),
+				sameSite: 'strict'
+			});
+		}
 
 		WebApp.SettingsButton?.show().onClick(() => {
 			goto(resolve('/webapp/settings'));
@@ -71,6 +78,7 @@
 	}
 
 	async function completeListConfirm() {
+		// TODO
 		// 	const list = await getList();
 		// 	const completeConfirmed = await new Promise((resolve) =>
 		// 		WebApp.showConfirm('Complete shopping list?', resolve)
@@ -94,11 +102,6 @@
 		// 	await clearLists();
 		// 	WebApp.close();
 	}
-
-	function toggleCategory(category: Category) {
-		// FIXME: doesn't work
-		category.collapsed = !category.collapsed;
-	}
 </script>
 
 {#snippet mention(user: UserAction['by'])}
@@ -109,20 +112,21 @@
 	{/if}
 {/snippet}
 
-{#await loginPromise}
-	<div class="flex h-full flex-col items-center justify-center gap-8">
-		<Spinner size="16" />
-		Logging in...
-	</div>
-{:then _}
+<svelte:boundary>
+	{#snippet pending()}
+		<div class="flex h-full flex-col items-center justify-center gap-8">
+			<Spinner size="16" />
+			Logging in...
+		</div>
+	{/snippet}
 	<main class="mt-2 flex flex-1 flex-col gap-4 overflow-auto">
 		{#each await getList() as category (category.id)}
 			<section>
 				<h2 class="m-1 flex items-center gap-2">
 					<span>{category.emoji}</span>
 					{category.label}
-					<button class="ml-auto text-primary" onclick={() => toggleCategory(category)}>
-						{#if category.collapsed}
+					<button class="ml-auto text-primary">
+						{#if false}
 							<ChevronsUpDown size={20} />
 						{:else}
 							<ChevronsDownUp size={20} />
@@ -162,15 +166,13 @@
 							</ListgroupItem>
 						</div>
 					{/each}
-					<ListgroupItem class="h-10 items-center py-0 pl-3.25">
-						<a
-							class="flex items-center gap-4 text-primary"
-							href={resolve('/webapp/item/[categoryId=uuid]', { categoryId: category.id })}
-							data-sveltekit-noscroll
-						>
-							<Plus strokeWidth={1.5} />
-							Add Item
-						</a>
+					<ListgroupItem
+						class="h-10 items-center gap-4 py-0 pl-3.25"
+						href={resolve('/webapp/item/[categoryId=uuid]', { categoryId: category.id })}
+						data-sveltekit-noscroll
+					>
+						<Plus strokeWidth={1.5} />
+						Add Item
 					</ListgroupItem>
 				</Listgroup>
 			</section>
@@ -187,9 +189,11 @@
 	</div>
 
 	{@render children?.()}
-{:catch error}
-	<div class="flex h-full flex-col items-center justify-center gap-8 text-red-600">
-		<ShieldAlert size={64} />
-		Error: {error.body.message}
-	</div>
-{/await}
+
+	{#snippet failed(error)}
+		<div class="flex h-full flex-col items-center justify-center gap-8 text-red-600">
+			<ShieldAlert size={64} />
+			Error: {error.body.message}
+		</div>
+	{/snippet}
+</svelte:boundary>

@@ -27,7 +27,6 @@ export interface Category {
 	label: string;
 	emoji: string;
 	items: Item[];
-	collapsed?: boolean;
 }
 
 export type List = Category[];

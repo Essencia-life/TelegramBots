@@ -1,19 +1,27 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
-import { command, getRequestEvent } from '$app/server';
-import { BOT_TOKEN } from '$env/static/private';
-import { error } from '@sveltejs/kit';
-import z from 'zod';
+import { type Cookies, error } from '@sveltejs/kit';
 import type { WebAppInitData, WebAppUser } from 'telegram-web-app';
+import { createHmac, timingSafeEqual } from 'node:crypto';
+import { BOT_TOKEN } from '$env/static/private';
 
 interface InitData extends Omit<WebAppInitData, 'user'> {
 	user?: string;
 }
 
-const zInitData = z
-	.string()
-	.transform((str) => Object.fromEntries(new URLSearchParams(str)) as unknown as InitData);
+interface Session extends Omit<WebAppInitData, 'hash' | 'user'> {
+	user: WebAppUser;
+}
 
-export const login = command(zInitData, async ({ hash, ...params }) => {
+export function getSession(cookies: Cookies): Session {
+	const initData = cookies.get('session');
+
+	if (!initData) {
+		return error(401, 'Unauthorized');
+	}
+
+	const { hash, ...params } = Object.fromEntries(
+		new URLSearchParams(initData)
+	) as unknown as InitData;
+
 	console.log(params);
 
 	if (!hash) {
@@ -43,22 +51,13 @@ export const login = command(zInitData, async ({ hash, ...params }) => {
 		return error(410, 'Init data has been expired');
 	}
 
-	if (params.user) {
-		const user = JSON.parse(params.user) as WebAppUser;
-		const { cookies } = getRequestEvent();
-
-		cookies.set(
-			'user',
-			JSON.stringify({
-				id: user.id,
-				name: user.first_name,
-				username: user.username
-			}),
-			{
-				path: '/',
-				httpOnly: true,
-				sameSite: 'strict'
-			}
-		);
+	if (!params.user) {
+		console.error('No user in init data');
+		return error(400, 'Invalid init data');
 	}
-});
+
+	return {
+		...params,
+		user: JSON.parse(params.user) as WebAppUser
+	};
+}

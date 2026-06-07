@@ -3,3 +3,5 @@ export const fractionMapping = new Map([
 	[0.5, '\u00BD'],
 	[0.75, '\u00BE']
 ]);
+
+export const emojiRegex = /\p{Emoji_Presentation}/u;

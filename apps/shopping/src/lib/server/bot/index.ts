@@ -4,17 +4,12 @@ import { Bot, Context, InlineKeyboard } from 'grammy';
 import { type EmojiFlavor, emojiParser, emoji } from '@grammyjs/emoji';
 
 import { shoppingList } from '$lib/server/utils/messageFormatter';
-import { createItem } from '$lib/server/utils/createItem';
 import listService from '../list.service';
 import lastMessageIdService from '../inlineMessageId.service';
-import type { InlineQueryResultsButton } from 'grammy/types';
 
 type MyContext = EmojiFlavor<Context>;
 
 export const bot = new Bot<MyContext>(BOT_TOKEN);
-
-const addItemRegEx =
-	/((?<amount>[0-9]+|half a|a|one)?\s?(?<unit>x|k?g|m?l|bags?|crate|heads?|jars?|bottles?)?( of)? )?(?<label>.+)/i;
 
 async function getInlineKeyboardOpenListButton() {
 	const botInfo = await bot.api.getMe();
@@ -28,11 +23,6 @@ async function getInlineKeyboardOpenListButton() {
 async function getInlineKeyboard() {
 	return new InlineKeyboard().row(await getInlineKeyboardOpenListButton());
 }
-
-const inlineQueryResultsButton: InlineQueryResultsButton = {
-	text: `${emoji('shopping_cart')} Open Shopping Bot`,
-	start_parameter: BOT_GROUP_CHAT_ID
-};
 
 bot.use(emojiParser());
 
@@ -56,43 +46,16 @@ bot.command('start', async (ctx) => {
 bot.on('inline_query', async (ctx, next) => {
 	if (ctx.inlineQuery.query === '') {
 		await ctx.answerInlineQuery([], {
-			button: inlineQueryResultsButton,
+			button: {
+				text: `${emoji('shopping_cart')} Open Shopping Bot`,
+				start_parameter: BOT_GROUP_CHAT_ID
+			},
 			// cache_time: 24 * 60 * 60
 			cache_time: 0
 		});
 	} else {
 		next();
 	}
-});
-
-bot.on('chosen_inline_result', async (ctx) => {
-	const item = createItem(
-		ctx.chosenInlineResult.from,
-		ctx.chosenInlineResult.query.match(addItemRegEx)!
-	);
-	const categoryId = ctx.chosenInlineResult.result_id;
-
-	console.log({ item, category: categoryId });
-
-	await listService.addItem(categoryId, item);
-
-	const list = await listService.getList();
-	const { message_id } = await bot.api.sendMessage(BOT_GROUP_CHAT_ID, shoppingList(list), {
-		message_thread_id: parseInt(BOT_TOPIC_ID),
-		parse_mode: 'HTML',
-		reply_markup: await getInlineKeyboard()
-	});
-
-	const lastMessageId = await lastMessageIdService.getId();
-	if (lastMessageId) {
-		try {
-			await bot.api.deleteMessage(BOT_GROUP_CHAT_ID, lastMessageId);
-		} catch (err) {
-			console.error(err);
-		}
-	}
-
-	await lastMessageIdService.setId(message_id);
 });
 
 export async function updateLastMessage(complete?: boolean, newList?: boolean) {

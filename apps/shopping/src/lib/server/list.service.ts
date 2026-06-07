@@ -38,14 +38,6 @@ class ListService {
 		await redis.json.clear(storageKey, '$.list..items');
 	}
 
-	async existsCategory(categoryId: string): Promise<boolean> {
-		const [categoryExists] = await redis.json.type(
-			storageKey,
-			`$.list[?(@.id == "${categoryId}")]`
-		);
-		return !!categoryExists;
-	}
-
 	async addCategory(category: CategoryCommand): Promise<void> {
 		await redis.json.arrappend(storageKey, '$.list', { ...category, items: [] });
 	}

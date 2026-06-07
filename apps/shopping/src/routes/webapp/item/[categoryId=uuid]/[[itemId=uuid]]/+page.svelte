@@ -4,8 +4,8 @@
 	import { Modal, Label, Select, Input, ButtonGroup, Toggle, Button, Alert } from 'flowbite-svelte';
 	import { deleteItem, setItem, type SetItemInput } from './item.remote';
 	import WebApp from '$lib/webapp';
+	import { units } from '$lib/config';
 
-	let open = $state(true);
 	let loading = $state(false);
 
 	const list = $derived(await getList());
@@ -15,11 +15,7 @@
 	);
 
 	$effect(() => {
-		if (category) {
-			setItem.fields.set({
-				categoryId: category.id
-			});
-		}
+		setItem.fields.categoryId.set(category?.id);
 	});
 
 	$effect(() => {
@@ -30,6 +26,8 @@
 				unit: item.unit,
 				personal: item.personal
 			});
+		} else {
+			setItem.fields.set({});
 		}
 	});
 
@@ -48,7 +46,6 @@
 		form.reset();
 
 		loading = false;
-		open = false;
 
 		history.back();
 	}
@@ -70,7 +67,6 @@
 			await deleteItem(item.id);
 
 			loading = false;
-			open = false;
 
 			history.back();
 		}
@@ -78,89 +74,68 @@
 </script>
 
 <Modal
-	{open}
+	open
 	title={item ? 'Edit Item' : 'Add Item'}
 	placement="bottom-center"
 	class="rounded-b-none"
 	onclose={() => history.back()}
 >
-	{#if open}
-		{#if item}
-			<Alert border color="secondary">
-				Added by
-				{#if item.added.by.username}
-					<a href="https://t.me/{item.added.by.username}">{item.added.by.name}</a>
-				{:else}
-					{item.added.by.name}
-				{/if}
-				on {item.added.at.toLocaleString()}.
-				{#if item.lastModified}
-					<br />
-					Last modified by
-					{#if item.lastModified.by.username}
-						<a href="https://t.me/{item.lastModified.by.username}">{item.lastModified.by.name}</a>
-					{:else}
-						{item.lastModified.by.name}
-					{/if}
-					on {item.lastModified.at.toLocaleString()}.
-				{/if}
-			</Alert>
-		{/if}
-		<form
-			id="item-form"
-			class="grid grid-cols-[1fr_2fr] items-center gap-x-4 gap-y-2"
-			{...setItem.enhance(onsubmit)}
-		>
-			<Label for="item-category">Category</Label>
-
-			<Select required id="item-category" {...setItem.fields.categoryId.as('select', category?.id)}>
-				{#each list as category}
-					<option value={category.id}>{category.label}</option>
-				{/each}
-			</Select>
-
-			<Label for="item-label">Item</Label>
-			<Input required autofocus id="item-label" {...setItem.fields.label.as('text')} />
-
-			<Label for="item-amount">Amount</Label>
-			<ButtonGroup>
-				<Input
-					id="item-amount"
-					{...setItem.fields.amount.as('number')}
-					inputmode="numeric"
-					class="text-right"
-				/>
-				<datalist id="units">
-					<option>x</option>
-					<option>g</option>
-					<option>kg</option>
-					<option>ml</option>
-					<option>l</option>
-					<option>bag</option>
-					<option>bags</option>
-					<option>head</option>
-					<option>heads</option>
-					<option>crate</option>
-					<option>crates</option>
-					<option>jar</option>
-					<option>jars</option>
-					<option>bottle</option>
-					<option>bottles</option>
-				</datalist>
-				<Input list="units" id="item-unit" placeholder="x" {...setItem.fields.unit.as('text')} />
-			</ButtonGroup>
-
-			<Label>Personal</Label>
-			<Toggle class="my-2" {...setItem.fields.personal.as('checkbox')}
-				>Buy this for me please</Toggle
-			>
-
-			{#if item}
-				<input {...setItem.fields.id.as('hidden', item.id)} />
-				<input {...setItem.fields.id.as('hidden', item.id)} />
+	{#if item}
+		<Alert border color="secondary">
+			Added by
+			{#if item.added.by.username}
+				<a href="https://t.me/{item.added.by.username}">{item.added.by.name}</a>
+			{:else}
+				{item.added.by.name}
 			{/if}
-		</form>
+			on {item.added.at.toLocaleString()}.
+			{#if item.lastModified}
+				<br />
+				Last modified by
+				{#if item.lastModified.by.username}
+					<a href="https://t.me/{item.lastModified.by.username}">{item.lastModified.by.name}</a>
+				{:else}
+					{item.lastModified.by.name}
+				{/if}
+				on {item.lastModified.at.toLocaleString()}.
+			{/if}
+		</Alert>
 	{/if}
+	<form
+		id="item-form"
+		class="grid grid-cols-[1fr_2fr] items-center gap-x-4 gap-y-2"
+		{...setItem.enhance(onsubmit)}
+	>
+		<Label for="item-category">Category</Label>
+
+		<Select required id="item-category" {...setItem.fields.categoryId.as('select', category?.id)}>
+			{#each list as category}
+				<option value={category.id}>{category.label}</option>
+			{/each}
+		</Select>
+
+		<Label for="item-label">Item</Label>
+		<Input required autofocus id="item-label" {...setItem.fields.label.as('text')} />
+
+		<Label for="item-amount">Amount</Label>
+		<ButtonGroup>
+			<Input
+				id="item-amount"
+				{...setItem.fields.amount.as('number')}
+				inputmode="numeric"
+				class="text-right"
+			/>
+			<Input data={units} id="item-unit" placeholder={units[0]} {...setItem.fields.unit.as('text')} />
+		</ButtonGroup>
+
+		<Label>Personal</Label>
+		<Toggle class="my-2" {...setItem.fields.personal.as('checkbox')}>Buy this for me please</Toggle>
+
+		{#if item}
+			<input {...setItem.fields.id.as('hidden', item.id)} />
+			<input {...setItem.fields.id.as('hidden', item.id)} />
+		{/if}
+	</form>
 
 	{#snippet footer()}
 		{#if item}
