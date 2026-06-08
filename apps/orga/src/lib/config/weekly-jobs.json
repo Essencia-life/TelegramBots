@@ -176,11 +176,11 @@
       "description": "A moderated group dialogue where one person at a time steps into the center (“the forum”) and speaks openly about what is alive for them—feelings, conflicts, desires, judgments, fears. The rest of the group listens attentively.\n\n<b>How it works</b>\n<ul><li>One person is in the center, supported by one or more trained facilitators.</li><li>The speaker is encouraged to move from stories and opinions to felt experience (emotions, body sensations,\tneeds).</li><li>The group does not interrupt, argue, or give advice unless explicitly invited.</li><li>The facilitator may challenge avoidance, unclear language, or social masks.</li><li>Others may later share brief reflections, usually as “how this affected me,” not evaluations.</li>\n</ul>\n\n<b>What it’s for</b>\n<ul><li>Making unspoken tensions visible before they turn toxic.</li><li>Resolving conflicts without blame or winner/loser dynamics.</li><li>Building emotional literacy and personal responsibility.</li><li>Strengthening community cohesion through radical transparency.</li>\n</ul>\n\n<b>What it is not</b>\n<ul><li>Not a debate.</li><li>Not group therapy, even if it can be emotionally intense.</li><li>Not about being “nice” or harmonious.</li><li>Not safe if facilitators are unskilled—this format needs competence.</li>\n</ul>",
       "location": "Shala",
       "startTime": {
-        "hour": 12,
+        "hour": 11,
         "minute": 0
       },
       "endTime": {
-        "hour": 13,
+        "hour": 12,
         "minute": 30
       },
       "weekday": 5,
@@ -202,11 +202,11 @@
       "description": "This meeting is a structured space for clarity and evolution within the community. It allows tensions to surface in a direct and constructive way, so they can become fuel for improvement instead of silent frustration.\n\nPlease come prepared. If tensions arise between meetings, write them down. Bring them with you. The more precise you are, the more effective the process becomes.\n\nWe begin in a round. Each person names one tension connected to the community. A tension can be anything that feels off, unclear, inefficient, or misaligned. We continue until no further tensions arise. All tensions are written down.\n\nAfterwards, we go through the list and ask who resonates with each point. The topics with the strongest resonance are addressed first, in that order.\n\nFor each selected tension, the tension owner presents a clear proposition — a concrete suggestion for how the issue could be handled or improved.\nThen we move into a clarification round. One by one, participants may ask questions if something in the proposition is unclear or if they sense something important may have been overlooked. This is not a discussion round, but a space to fully understand what is being proposed.\n\nOnce everything is clear, the group is asked: “Can you live with that?”\n\nIf everyone agrees, the decision stands and we move on to the next tension.\nIf someone cannot live with it, that person is invited to present a counter-proposition. The process then repeats: clarification, followed again by the question, “Can you live with that?”\n\nThe intention is not to seek perfection, but workable alignment. The meeting transforms friction into forward movement and gives innovation a clear structure.",
       "location": "Hive",
       "startTime": {
-        "hour": 12,
+        "hour": 11,
         "minute": 0
       },
       "endTime": {
-        "hour": 13,
+        "hour": 12,
         "minute": 30
       },
       "weekday": 5,
@@ -216,16 +216,6 @@
         {
           "name": "moderator",
           "title": "Innovations Moderator",
-          "persons": 1
-        },
-        {
-          "name": "timekeeper",
-          "title": "Innovations Time Keeper",
-          "persons": 1
-        },
-        {
-          "name": "writer",
-          "title": "Innovations Writer",
           "persons": 1
         }
       ]
