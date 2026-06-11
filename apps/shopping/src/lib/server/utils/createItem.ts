@@ -19,7 +19,9 @@ function amountMapping(amountStr: string): number | undefined {
 
 export function createItem(from: User, match: RegExpMatchArray): Item {
 	const { id, username, first_name: name } = from;
-	let { amount, unit, label } = match.groups ?? {};
+	const matchGroups = match.groups ?? {};
+	const { amount, unit } = matchGroups;
+	let { label } = matchGroups
 	let personal;
 
 	if (label.endsWith(' for me')) {

@@ -109,7 +109,7 @@
 		<Label for="item-category">Category</Label>
 
 		<Select required id="item-category" {...setItem.fields.categoryId.as('select', category?.id)}>
-			{#each list as category}
+			{#each list as category (category.id)}
 				<option value={category.id}>{category.label}</option>
 			{/each}
 		</Select>
@@ -125,7 +125,12 @@
 				inputmode="numeric"
 				class="text-right"
 			/>
-			<Input data={units} id="item-unit" placeholder={units[0]} {...setItem.fields.unit.as('text')} />
+			<Input
+				data={units}
+				id="item-unit"
+				placeholder={units[0]}
+				{...setItem.fields.unit.as('text')}
+			/>
 		</ButtonGroup>
 
 		<Label>Personal</Label>
@@ -133,7 +138,7 @@
 
 		{#if item}
 			<input {...setItem.fields.id.as('hidden', item.id)} />
-			<input {...setItem.fields.id.as('hidden', item.id)} />
+			<input {...setItem.fields.previousCategoryId.as('hidden', category.id)} />
 		{/if}
 	</form>
 

@@ -2,7 +2,6 @@
 @source '../../../../node_modules/flowbite-svelte/dist';
 
 @layer base {
-
 	html,
 	body {
 		@apply h-full;

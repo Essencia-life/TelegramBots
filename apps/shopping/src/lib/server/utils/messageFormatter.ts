@@ -16,7 +16,7 @@ export function itemText(item: Item) {
 			text += item.amount.toString();
 		}
 
-		text += `\u200A${item.unit ?? units[0]} `;
+		text += `\u200A${item.unit || units[0]} `;
 	}
 
 	return text + item.label;

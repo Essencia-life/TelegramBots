@@ -35,6 +35,23 @@ export const checkListItem = command(zUuid, async (itemId) => {
 	void getList().refresh();
 });
 
+const zMoveListItemInput = z.object({
+	id: zUuid,
+	categoryId: zUuid,
+	before: zUuid.optional(),
+	after: zUuid.optional()
+});
+
+export const moveListItem = command(zMoveListItemInput, async ({ id, categoryId, ...insert }) => {
+	const { cookies } = getRequestEvent();
+	getSession(cookies);
+
+	await listService.moveItemInsideCategory(categoryId, id, insert);
+
+	await updateLastMessage();
+	void getList().refresh();
+});
+
 export const completeList = command(z.boolean(), async (newList: boolean) => {
 	const { cookies } = getRequestEvent();
 	getSession(cookies);
