@@ -64,8 +64,12 @@
 	<h2 class="m-1 flex items-center gap-2">
 		<span>{category.emoji}</span>
 		{category.label}
-		<button class="ml-auto text-primary" onclick={() => toggleCategory(category.id)}>
+		<button
+			class="ml-auto inline-flex items-center gap-2 font-sans text-sm text-primary"
+			onclick={() => toggleCategory(category.id)}
+		>
 			{#if collapsedCategories[category.id]}
+				({checkedItems.length} of {items.length + checkedItems.length})
 				<ChevronsUpDown size={20} />
 			{:else}
 				<ChevronsDownUp size={20} />
