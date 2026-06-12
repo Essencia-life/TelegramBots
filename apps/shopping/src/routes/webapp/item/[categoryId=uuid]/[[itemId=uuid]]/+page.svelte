@@ -123,7 +123,6 @@
 				id="item-amount"
 				{...setItem.fields.amount.as('number')}
 				inputmode="numeric"
-				placeholder="1"
 				class="text-right"
 			/>
 			<Input
