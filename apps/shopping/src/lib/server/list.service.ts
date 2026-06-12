@@ -63,7 +63,8 @@ class ListService {
 	async moveCategory(categoryId: UUID, insertIndex: number) {
 		console.log('moveCategory', { categoryId, insertIndex });
 
-		const [category] = await redis.json.get<Category[]>(storageKey, `$.list[?(@.id == "${categoryId}")]`) ?? [];
+		const [category] =
+			(await redis.json.get<Category[]>(storageKey, `$.list[?(@.id == "${categoryId}")]`)) ?? [];
 
 		if (!category) {
 			return;

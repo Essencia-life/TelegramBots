@@ -21,7 +21,7 @@ export function createItem(from: User, match: RegExpMatchArray): Item {
 	const { id, username, first_name: name } = from;
 	const matchGroups = match.groups ?? {};
 	const { amount, unit } = matchGroups;
-	let { label } = matchGroups
+	let { label } = matchGroups;
 	let personal;
 
 	if (label.endsWith(' for me')) {

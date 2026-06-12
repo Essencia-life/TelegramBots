@@ -8,14 +8,20 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	
+
 	import ShieldAlert from '@lucide/svelte/icons/shield-alert';
-	
+
 	import WebApp from '$lib/webapp';
-	
+
 	import ListCategory from './ListCategory.svelte';
-	
-	import { clearLists, completeList, deleteCheckedListItems, getList, sendNewList } from './list.remote';
+
+	import {
+		clearLists,
+		completeList,
+		deleteCheckedListItems,
+		getList,
+		sendNewList
+	} from './list.remote';
 
 	interface Props {
 		children: Snippet;

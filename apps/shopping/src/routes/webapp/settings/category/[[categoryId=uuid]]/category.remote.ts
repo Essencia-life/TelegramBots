@@ -8,7 +8,6 @@ import { emojiRegex } from '$lib/utils';
 import { getSession } from '$lib/server/session';
 import { getList } from '../../../list.remote';
 import { updateLastMessage } from '$lib/server/bot';
-import type { CategoryCommand } from '$lib/server/list.service';
 
 const zUuid = z.uuid().transform((str) => str as UUID);
 
@@ -27,7 +26,7 @@ export const setCategory = form(zSetCategory, async (category) => {
 	if (category.id) {
 		await listService.updateCategory({
 			id: category.id,
-			...category,
+			...category
 		});
 	} else {
 		const storageExists = await redis.exists(storageKey);

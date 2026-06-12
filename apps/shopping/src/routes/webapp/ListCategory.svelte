@@ -1,12 +1,14 @@
 <script lang="ts">
 	import { flip } from 'svelte/animate';
 	import { slide } from 'svelte/transition';
+	import { resolve } from '$app/paths';
 
 	import { dragHandleZone, dragHandle, type DndEvent, type Options } from 'svelte-dnd-action';
 	import { Listgroup, ListgroupItem, Badge } from 'flowbite-svelte';
 
 	import { fractionMapping } from '$lib/utils';
-	import { checkListItem, moveListItem } from './list.remote';
+	import type { Category, Item } from '$lib/schema';
+	import { getCollapsedCategories, toggleCategory } from '$lib/cloudStorage.svelte';
 
 	import Plus from '@lucide/svelte/icons/plus';
 	import GripVertical from '@lucide/svelte/icons/grip-vertical';
@@ -14,8 +16,8 @@
 	import ChevronsUpDown from '@lucide/svelte/icons/chevrons-up-down';
 
 	import AsyncCheckbox from './AsyncCheckbox.svelte';
-	import type { Category, Item } from '$lib/schema';
-	import { resolve } from '$app/paths';
+
+	import { checkListItem, moveListItem } from './list.remote';
 
 	interface Props {
 		category: Category;
@@ -27,6 +29,7 @@
 		flipDurationMs: 300
 	};
 	const { category }: Props = $props();
+	const collapsedCategories = getCollapsedCategories();
 
 	let items = $derived(category.items.filter((item) => !item.checked));
 	let checkedItems = $derived(category.items.filter((item) => item.checked));
@@ -61,49 +64,48 @@
 	<h2 class="m-1 flex items-center gap-2">
 		<span>{category.emoji}</span>
 		{category.label}
-		<button class="ml-auto text-primary">
-			{#if false}
+		<button class="ml-auto text-primary" onclick={() => toggleCategory(category.id)}>
+			{#if collapsedCategories[category.id]}
 				<ChevronsUpDown size={20} />
 			{:else}
 				<ChevronsDownUp size={20} />
 			{/if}
 		</button>
 	</h2>
-	<Listgroup active>
-		{#each checkedItems as item (item.id)}
-			<div
-				animate:flip={{ duration: dropZoneOptions.flipDurationMs }}
-				transition:slide={{ duration: 500 }}
-			>
-				{@render listItem(item)}
-			</div>
-		{/each}
-
-		{#if items.length}
-			<div
-				class="divide-y divide-gray-200 dark:divide-gray-700"
-				use:dragHandleZone={{ items, ...dropZoneOptions, dragDisabled: items.length < 2 }}
-				onconsider={handleSort}
-				onfinalize={saveSort}
-			>
-				{#each items as item (item.id)}
-					<div
-						animate:flip={{ duration: dropZoneOptions.flipDurationMs }}
-					>
+	{#if !collapsedCategories[category.id]}
+		<div transition:slide>
+			<Listgroup active>
+				{#each checkedItems as item (item.id)}
+					<div animate:flip={{ duration: dropZoneOptions.flipDurationMs }}>
 						{@render listItem(item)}
 					</div>
 				{/each}
-			</div>
-		{/if}
-		<ListgroupItem
-			class="h-10 items-center gap-4 py-0 pl-3.25"
-			href={resolve('/webapp/item/[categoryId=uuid]', { categoryId: category.id })}
-			data-sveltekit-noscroll
-		>
-			<Plus strokeWidth={1.5} />
-			Add Item
-		</ListgroupItem>
-	</Listgroup>
+
+				{#if items.length}
+					<div
+						class="divide-y divide-gray-200 dark:divide-gray-700"
+						use:dragHandleZone={{ items, ...dropZoneOptions, dragDisabled: items.length < 2 }}
+						onconsider={handleSort}
+						onfinalize={saveSort}
+					>
+						{#each items as item (item.id)}
+							<div animate:flip={{ duration: dropZoneOptions.flipDurationMs }}>
+								{@render listItem(item)}
+							</div>
+						{/each}
+					</div>
+				{/if}
+				<ListgroupItem
+					class="h-10 items-center gap-4 py-0 pl-3.25"
+					href={resolve('/webapp/item/[categoryId=uuid]', { categoryId: category.id })}
+					data-sveltekit-noscroll
+				>
+					<Plus strokeWidth={1.5} />
+					Add Item
+				</ListgroupItem>
+			</Listgroup>
+		</div>
+	{/if}
 </section>
 
 {#snippet listItem(item: Item)}
