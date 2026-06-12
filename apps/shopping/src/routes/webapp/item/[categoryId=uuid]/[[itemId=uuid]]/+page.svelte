@@ -88,7 +88,7 @@
 			{:else}
 				{item.added.by.name}
 			{/if}
-			on {item.added.at.toLocaleString()}.
+			on {new Date(item.added.at).toLocaleString()}.
 			{#if item.lastModified}
 				<br />
 				Last modified by
@@ -97,7 +97,7 @@
 				{:else}
 					{item.lastModified.by.name}
 				{/if}
-				on {item.lastModified.at.toLocaleString()}.
+				on {new Date(item.lastModified.at).toLocaleString()}.
 			{/if}
 		</Alert>
 	{/if}
@@ -123,12 +123,14 @@
 				id="item-amount"
 				{...setItem.fields.amount.as('number')}
 				inputmode="numeric"
+				placeholder="1"
 				class="text-right"
 			/>
 			<Input
 				data={units}
 				id="item-unit"
 				placeholder={units[0]}
+				class="rounded-l-none!"
 				{...setItem.fields.unit.as('text')}
 			/>
 		</ButtonGroup>
