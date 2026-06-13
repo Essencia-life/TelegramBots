@@ -50,8 +50,7 @@ bot.on('inline_query', async (ctx, next) => {
 				text: `${emoji('shopping_cart')} Open Shopping Bot`,
 				start_parameter: BOT_GROUP_CHAT_ID
 			},
-			// cache_time: 24 * 60 * 60
-			cache_time: 0
+			cache_time: 24 * 60 * 60
 		});
 	} else {
 		next();
