@@ -4,94 +4,172 @@ import { storageKey } from '$lib/server/utils/config';
 import type { UUID } from 'crypto';
 
 export interface CheckCommand {
-    itemId: string;
-    userAction: UserAction;
+	itemId: string;
+	userAction: UserAction;
 }
 
 export type CategoryCommand = Omit<Category, 'items'>;
 
 class ListService {
-    async initList(): Promise<void> {
-        await redis.json.set(storageKey, '$', { list: [] }, { nx: true });
-    }
+	async initList(): Promise<void> {
+		await redis.json.set(storageKey, '$', { list: [] }, { nx: true });
+	}
 
-    async getList(): Promise<List> {
-        const list = await redis.json.get<List>(storageKey, '$.list.*') ?? [];
+	async getList(): Promise<List> {
+		return (await redis.json.get<List>(storageKey, '$.list.*')) ?? [];
+	}
 
-        return list.map(category => ({
-            ...category,
-            items: category.items.sort((a, b) => Number(b.checked) - Number(a.checked))
-        }));
-    }
+	async getCompletedList(): Promise<List> {
+		const list = (await redis.json.get<List>(storageKey, '$.list.*')) ?? [];
 
-    async getCompletedList(): Promise<List> {
-        const list = await redis.json.get<List>(storageKey, '$.list.*') ?? [];
+		return list.map((category) => ({
+			...category,
+			items: category.items.filter((item) => item.checked)
+		}));
+	}
 
-        return list.map(category => ({
-            ...category,
-            items: category.items.filter(item => item.checked)
-        }));
-    }
+	async clearLists() {
+		console.log('clearLists');
+		await redis.json.clear(storageKey, '$.list..items');
+	}
 
-    async clearLists() {
-        console.log('clearLists');
-        await redis.json.clear(storageKey, '$.list..items');
-    }
+	async addCategory(category: CategoryCommand): Promise<void> {
+		console.log('addCategory', { category });
+		await redis.json.arrappend(storageKey, '$.list', { ...category, items: [] });
+	}
 
-    async existsCategory(categoryId: string): Promise<boolean> {
-        const [categoryExists] = await redis.json.type(storageKey, `$.list[?(@.id == "${categoryId}")]`)
-        return !!categoryExists;
-    }
+	async updateCategory(category: CategoryCommand) {
+		console.log('updateCategory', { category });
 
-    async addCategory(category: CategoryCommand): Promise<void> {
-        await redis.json.arrappend(storageKey, '$.list', { ...category, items: [] });
-    }
+		await redis.json.mset(
+			{
+				key: storageKey,
+				path: `$.list[?(@.id == "${category.id}")].emoji`,
+				value: JSON.stringify(category.emoji)
+			},
+			{
+				key: storageKey,
+				path: `$.list[?(@.id == "${category.id}")].label`,
+				value: JSON.stringify(category.label)
+			}
+		);
+	}
 
-    async updateCategory(category: CategoryCommand) {
-        await redis.json.mset({
-            key: storageKey, path: `$.list[?(@.id == "${category.id}")].emoji`, value: JSON.stringify(category.emoji),
-        }, {
-            key: storageKey, path: `$.list[?(@.id == "${category.id}")].label`, value: JSON.stringify(category.label),
-        });
-    }
+	async deleteCategory(categoryId: UUID) {
+		console.log('deleteCategory', { categoryId });
+		await redis.json.del(storageKey, `$.list[?(@.id == "${categoryId}")]`);
+	}
 
-    async deleteCategory(categoryId: string) {
-        await redis.json.del(storageKey, `$.list[?(@.id == "${categoryId}")]`);
-    }
+	async moveCategory(categoryId: UUID, insertIndex: number) {
+		console.log('moveCategory', { categoryId, insertIndex });
 
-    async addItem(categoryId: string, item: Item): Promise<void> {
-        console.log('addItem');
-        await redis.json.arrappend(storageKey, `$.list[?(@.id == "${categoryId}")].items`, item);
-    }
+		const [category] =
+			(await redis.json.get<Category[]>(storageKey, `$.list[?(@.id == "${categoryId}")]`)) ?? [];
 
-    async checkItem({ itemId, userAction }: CheckCommand): Promise<void> {
-        console.log('checkItem');
-        const itemPath = `$.list..items[?(@.id == "${itemId}")]`;
+		if (!category) {
+			return;
+		}
 
-        await redis.json.set(storageKey, `${itemPath}.lastModified`, JSON.stringify(userAction));
-        await redis.json.toggle(storageKey, `${itemPath}.checked`);
-    }
+		await redis.json.del(storageKey, `$.list[?(@.id == "${categoryId}")]`);
+		await redis.json.arrinsert(storageKey, `$.list`, insertIndex, category);
+	}
 
-    async updateItem(item: Item): Promise<void> {
-        console.log('updateItem');
-        await redis.json.set(storageKey, `$.list..items[?(@.id == "${item.id}")]`, JSON.stringify(item));
-    }
+	async getItem(itemId: UUID): Promise<Item | undefined> {
+		console.log('getItem', { itemId });
+		const [item] =
+			(await redis.json.get<Item[]>(storageKey, `$.list..items[?(@.id == "${itemId}")]`)) ?? [];
+		return item;
+	}
 
-    async updateItemCategory(categoryId: string, newCategoryId: string, item: Item) {
-        console.log('updateItemCategory');
-        await redis.json.arrappend(storageKey, `$.list[?(@.id == "${newCategoryId}")].items`, item);
-        await redis.json.del(storageKey, `$.list[?(@.id == "${categoryId}")].items[?(@.id == "${item.id}")]`);
-    }
+	async addItem(categoryId: string, item: Item): Promise<void> {
+		console.log('addItem', { categoryId, item });
+		await redis.json.arrappend(storageKey, `$.list[?(@.id == "${categoryId}")].items`, item);
+	}
 
-    async deleteItem(itemId: UUID): Promise<void> {
-        console.log('deleteItem', itemId);
-        await redis.json.del(storageKey, `$.list..items[?(@.id == "${itemId}")]`);
-    }
+	async checkItem({ itemId, userAction }: CheckCommand): Promise<void> {
+		console.log('checkItem', { itemId });
+		const itemPath = `$.list..items[?(@.id == "${itemId}")]`;
 
-    async deleteCheckedItems(): Promise<void> {
-        console.log('deleteCheckedItems');
-        await redis.json.del(storageKey, `$.list..items[?(@.checked == true)]`);
-    }
+		await redis.json.set(storageKey, `${itemPath}.lastModified`, JSON.stringify(userAction));
+		await redis.json.toggle(storageKey, `${itemPath}.checked`);
+	}
+
+	async updateItem(item: Item): Promise<void> {
+		console.log('updateItem', { item });
+		await redis.json.set(
+			storageKey,
+			`$.list..items[?(@.id == "${item.id}")]`,
+			JSON.stringify(item)
+		);
+	}
+
+	async updateItemAndCategory(categoryId: string, newCategoryId: string, item: Item) {
+		console.log('updateItemCategory', { categoryId, newCategoryId, item });
+		await redis.json.arrappend(storageKey, `$.list[?(@.id == "${newCategoryId}")].items`, item);
+		await redis.json.del(
+			storageKey,
+			`$.list[?(@.id == "${categoryId}")].items[?(@.id == "${item.id}")]`
+		);
+	}
+
+	async deleteItem(itemId: UUID): Promise<void> {
+		console.log('deleteItem', { itemId });
+		await redis.json.del(storageKey, `$.list..items[?(@.id == "${itemId}")]`);
+	}
+
+	async deleteCheckedItems(): Promise<void> {
+		console.log('deleteCheckedItems');
+		await redis.json.del(storageKey, `$.list..items[?(@.checked == true)]`);
+	}
+
+	async moveItemInsideCategory(
+		categoryId: UUID,
+		itemId: UUID,
+		insert: { before?: UUID; after?: UUID }
+	) {
+		console.log('moveItemInsideCategory', { categoryId, itemId, insert });
+
+		const [items] =
+			(await redis.json.get<Item[][]>(storageKey, `$.list[?(@.id == "${categoryId}")].items`)) ??
+			[];
+
+		if (!items?.length) {
+			return;
+		}
+
+		const itemIndex = items.findIndex((item) => item.id === itemId);
+		if (itemIndex === -1) {
+			return;
+		}
+
+		const item = items[itemIndex];
+		const targetId = insert.before ?? insert.after;
+		if (!targetId) {
+			return;
+		}
+
+		const targetIndex = items.findIndex((item) => item.id === targetId);
+		if (targetIndex === -1) {
+			return;
+		}
+
+		let insertIndex = insert.before ? targetIndex : targetIndex + 1;
+		if (itemIndex < insertIndex) {
+			insertIndex -= 1;
+		}
+
+		await redis.json.del(
+			storageKey,
+			`$.list[?(@.id == "${categoryId}")].items[?(@.id == "${itemId}")]`
+		);
+
+		await redis.json.arrinsert(
+			storageKey,
+			`$.list[?(@.id == "${categoryId}")].items`,
+			insertIndex,
+			item
+		);
+	}
 }
 
 export default new ListService();

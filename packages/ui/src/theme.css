@@ -18,6 +18,16 @@
   --color-primary-900: #2d3425;
 
   --color-accent: #60482f;
+  --color-accent-50: #f6efe6;
+  --color-accent-100: #e5d7c7;
+  --color-accent-200: #cfb69d;
+  --color-accent-300: #b88a6d;
+  --color-accent-400: #9e6f55;
+  --color-accent-500: #60482f;
+  --color-accent-600: #533f2a;
+  --color-accent-700: #423423;
+  --color-accent-800: #33291f;
+  --color-accent-900: #271f18;
 
   --color-background: #fcfaf4;
   --color-surface: #f8f5ec;

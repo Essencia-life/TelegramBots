@@ -1,3 +1,4 @@
+import { units } from '$lib/config';
 import type { Category, Item, List } from '$lib/schema';
 import { fractionMapping } from '$lib/utils';
 
@@ -15,7 +16,7 @@ export function itemText(item: Item) {
 			text += item.amount.toString();
 		}
 
-		text += `\u200A${item.unit ?? '\u00D7'} `;
+		text += `\u200A${item.unit || units[0]} `;
 	}
 
 	return text + item.label;
@@ -50,4 +51,3 @@ function category(category: Category) {
 export function shoppingList(list: List): string {
 	return list.reduce(formatAs(category), '');
 }
-

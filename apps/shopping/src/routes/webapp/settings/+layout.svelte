@@ -1,70 +1,92 @@
 <script lang="ts">
-	import Plus from '@lucide/svelte/icons/plus';
-	import { dialogOpen } from '$lib/attachments/dialogOpen';
-	import { getList } from '$lib/remote/list.remote';
-	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
 	import type { Snippet } from 'svelte';
-	import type { UUID } from 'node:crypto';
+	import { dragHandleZone, dragHandle, type DndEvent, type Options } from 'svelte-dnd-action';
+	import { Modal, Listgroup, ListgroupItem } from 'flowbite-svelte';
+
+	import { resolve } from '$app/paths';
+
+	import Plus from '@lucide/svelte/icons/plus';
+	import GripVertical from '@lucide/svelte/icons/grip-vertical';
+
+	import { getList } from '../list.remote';
+	import type { Category } from '$lib/schema';
+	import { moveCategory } from './category/[[categoryId=uuid]]/category.remote';
+	import { flip } from 'svelte/animate';
 
 	interface Props {
 		children: Snippet;
 	}
 
 	const { children }: Props = $props();
+	const dropZoneOptions: Omit<Options, 'items'> = {
+		dropFromOthersDisabled: true,
+		dropTargetStyle: { outline: 'none' },
+		flipDurationMs: 300
+	};
+
+	let categories = $derived(await getList());
+
+	function handleSort(e: CustomEvent<DndEvent<Category>>) {
+		categories = e.detail.items;
+	}
+
+	async function saveSort(e: CustomEvent<DndEvent<Category>>) {
+		categories = e.detail.items;
+
+		const categoryId = e.detail.info.id;
+		const insertIndex = categories.findIndex((category) => category.id === categoryId);
+
+		await moveCategory({ categoryId, insertIndex });
+	}
 </script>
 
-<dialog {@attach dialogOpen} class="settings" onclose={() => history.back()}>
-	<section>
-		<header>Categories</header>
-		<ul>
-			{#each await getList() as category}
-				<li>
-					<button
-						class="link"
-						onclick={() =>
-							goto(
-								resolve('/webapp/settings/category/[categoryId=uuid]', {
-									categoryId: category.id as UUID
-								})
-							)}
-					>
-						<div class="emoji">{category.emoji}</div>
-						{category.label}
-					</button>
-				</li>
-			{/each}
-			<li>
-				<button class="link" onclick={() => goto(resolve('/webapp/settings/category'))}>
-					<Plus />
-					Add Category
-				</button>
-			</li>
-		</ul>
-	</section>
-</dialog>
+<Modal
+	open
+	title="Settings"
+	placement="bottom-center"
+	class="rounded-b-none"
+	onclose={() => history.back()}
+>
+	<h4>Categories</h4>
+	<Listgroup active>
+		{#if categories.length}
+			<div
+				class="divide-y divide-gray-200 dark:divide-gray-700"
+				use:dragHandleZone={{
+					items: categories,
+					...dropZoneOptions,
+					dragDisabled: categories.length < 2
+				}}
+				onconsider={handleSort}
+				onfinalize={saveSort}
+			>
+				{#each categories as category (category.id)}
+					<div animate:flip={{ duration: dropZoneOptions.flipDurationMs }}>
+						<ListgroupItem
+							href={resolve('/webapp/settings/category/[[categoryId=uuid]]', {
+								categoryId: category.id
+							})}
+							data-sveltekit-noscroll
+							class="h-10 items-center py-0 pr-1"
+						>
+							<div class="text-lg">{category.emoji}</div>
+							{category.label}
+							<button class="ml-auto text-gray-200 dark:text-gray-600" use:dragHandle>
+								<GripVertical />
+							</button>
+						</ListgroupItem>
+					</div>
+				{/each}
+			</div>
+		{/if}
+		<ListgroupItem
+			class="h-10 items-center py-0 pl-3.25"
+			href={resolve('/webapp/settings/category')}
+		>
+			<Plus strokeWidth={1.5} />
+			Add Category
+		</ListgroupItem>
+	</Listgroup>
+</Modal>
 
 {@render children?.()}
-
-<style>
-	ul {
-		margin-block: 16px;
-	}
-
-	button.link {
-		appearance: none;
-		display: flex;
-		height: 40px;
-		width: 100%;
-		align-items: center;
-		gap: 8px;
-		border: 0;
-		padding: 0;
-		font: inherit;
-		text-align: left;
-	}
-
-	button .emoji {
-		font-size: 24px;
-	}
-</style>

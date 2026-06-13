@@ -3,11 +3,7 @@
 
 @layer base {
 	body {
-		@apply mx-4 my-2 bg-surface;
-	}
-
-	body {
-		@apply text-text;
+		@apply mx-4 my-2 bg-surface text-text;
 	}
 
 	/* FIXME should be in theme */
