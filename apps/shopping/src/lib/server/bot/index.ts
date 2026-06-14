@@ -70,12 +70,10 @@ export async function updateLastMessage(complete?: boolean, newList?: boolean) {
 					parse_mode: 'HTML'
 				});
 			} else {
-				await bot.api.editMessageReplyMarkup(BOT_GROUP_CHAT_ID, lastMessageId, {
-					reply_markup: new InlineKeyboard().switchInlineCurrent(
-						`${emoji('shopping_cart')} Add Item to new List`
-					)
-				});
+				await bot.api.editMessageReplyMarkup(BOT_GROUP_CHAT_ID, lastMessageId);
 			}
+
+			await bot.api.unpinChatMessage(BOT_GROUP_CHAT_ID, lastMessageId);
 
 			await lastMessageIdService.deleteId();
 		} else {
@@ -109,6 +107,8 @@ export async function sendNewList() {
 	});
 
 	await lastMessageIdService.setId(message_id);
+
+	await bot.api.pinChatMessage(BOT_GROUP_CHAT_ID, message_id);
 }
 
 bot.catch(errorHandlerCallback(bot, BOT_ADMIN_CHAT_ID));
