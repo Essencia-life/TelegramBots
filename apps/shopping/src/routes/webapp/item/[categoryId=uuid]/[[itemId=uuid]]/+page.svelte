@@ -31,25 +31,6 @@
 		}
 	});
 
-	async function onsubmit({
-		form,
-		submit
-	}: {
-		form: HTMLFormElement;
-		data: SetItemInput;
-		submit: () => Promise<boolean>;
-	}) {
-		loading = true;
-
-		await submit();
-
-		form.reset();
-
-		loading = false;
-
-		history.back();
-	}
-
 	async function confirmAndDelete() {
 		const confirmed = await new Promise((resolve) =>
 			WebApp.showPopup(
@@ -104,7 +85,17 @@
 	<form
 		id="item-form"
 		class="grid grid-cols-[1fr_2fr] items-center gap-x-4 gap-y-2"
-		{...setItem.enhance(onsubmit)}
+		{...setItem.enhance(async (form) => {
+			loading = true;
+
+			await form.submit();
+
+			form.element.reset();
+
+			loading = false;
+
+			history.back();
+		})}
 	>
 		<Label for="item-category">Category</Label>
 

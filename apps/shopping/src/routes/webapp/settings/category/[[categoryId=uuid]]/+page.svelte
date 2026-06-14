@@ -22,24 +22,6 @@
 
 	let loading = $state(false);
 
-	async function onsubmit({
-		form,
-		submit
-	}: {
-		form: HTMLFormElement;
-		data: SetCategoryInput;
-		submit: () => Promise<boolean>;
-	}) {
-		loading = true;
-
-		await submit();
-		form.reset();
-
-		loading = false;
-
-		history.back();
-	}
-
 	async function confirmAndDelete() {
 		if (category.items.length > 0) {
 			WebApp.showAlert('Category still have items. Please move or delete those before.');
@@ -77,7 +59,16 @@
 	<form
 		id="category-form"
 		class="grid grid-cols-[1fr_2fr] items-center gap-x-4 gap-y-2"
-		{...setCategory.enhance(onsubmit)}
+		{...setCategory.enhance(async (form) => {
+			loading = true;
+
+			await form.submit();
+			form.element.reset();
+
+			loading = false;
+
+			history.back();
+		})}
 	>
 		<Label for="category-label">Emoji & Label</Label>
 		<ButtonGroup>
