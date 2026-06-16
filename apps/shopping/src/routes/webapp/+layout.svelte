@@ -29,6 +29,7 @@
 
 	const { children }: Props = $props();
 
+	let ready = $state(false);
 	let refreshIntervalInstance: number;
 
 	onMount(async () => {
@@ -50,6 +51,8 @@
 		WebApp.BackButton?.onClick(() => {
 			history.back();
 		});
+
+		ready = true;
 
 		refreshInterval();
 	});
@@ -105,12 +108,16 @@
 	}
 </script>
 
+{#snippet loading()}
+	<div class="flex h-full flex-col items-center justify-center gap-8">
+		<Spinner size="16" />
+		Logging in...
+	</div>
+{/snippet}
+
 <svelte:boundary>
 	{#snippet pending()}
-		<div class="flex h-full flex-col items-center justify-center gap-8">
-			<Spinner size="16" />
-			Logging in...
-		</div>
+		{@render loading()}
 	{/snippet}
 
 	{#snippet failed(error)}
@@ -120,20 +127,24 @@
 		</div>
 	{/snippet}
 
-	<main class="mt-2 flex flex-1 flex-col gap-4 overflow-auto">
-		{#each await getList() as category (category.id)}
-			<ListCategory {category} />
-		{:else}
-			<p>
-				There are no lists available.<br />
-				Go to <a href={resolve('/webapp/settings')}>settings</a> to create new lists.
-			</p>
-		{/each}
-	</main>
+	{#if ready}
+		<main class="mt-2 flex flex-1 flex-col gap-4 overflow-auto">
+			{#each await getList() as category (category.id)}
+				<ListCategory {category} />
+			{:else}
+				<p>
+					There are no lists available.<br />
+					Go to <a href={resolve('/webapp/settings')}>settings</a> to create new lists.
+				</p>
+			{/each}
+		</main>
 
-	<div class="py-3">
-		<Button class="w-full" onclick={completeListConfirm}>Complete Shopping List</Button>
-	</div>
+		<div class="py-3">
+			<Button class="w-full" onclick={completeListConfirm}>Complete Shopping List</Button>
+		</div>
 
-	{@render children?.()}
+		{@render children?.()}
+	{:else}
+		{@render loading()}
+	{/if}
 </svelte:boundary>
