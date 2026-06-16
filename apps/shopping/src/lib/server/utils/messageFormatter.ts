@@ -49,5 +49,8 @@ function category(category: Category) {
 }
 
 export function shoppingList(list: List): string {
-	return list.reduce(formatAs(category), '');
+	return list.map((category) => ({
+			...category,
+			items: category.items.sort((a, b) => Number(b.checked) - Number(a.checked))
+		})).reduce(formatAs(category), '');
 }
