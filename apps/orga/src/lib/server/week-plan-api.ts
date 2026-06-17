@@ -1,13 +1,13 @@
 import type { TelegramUser } from '$lib/server/db/users.ts';
-import calendar, { type CalendarEvent } from '$lib/server/calendar.ts';
+import calendar, { type CalendarEvent } from '$lib/server/calendar';
 import { DateTime } from 'luxon';
 import weeklyJobs from '$lib/config/weekly-jobs.json';
 import {
 	type LunarRelation,
 	matchesRelationToLunarPhase,
 	type Weekday
-} from '$lib/utils/lunar-matching.ts';
-import lunarProvider, { type MoonPhase } from '$lib/utils/lunar-provider.ts';
+} from '$lib/utils/lunar-matching';
+import lunarProvider, { type MoonPhase } from '$lib/utils/lunar-provider';
 import type { calendar_v3 } from 'googleapis';
 
 const timeZone = 'Europe/Lisbon';
