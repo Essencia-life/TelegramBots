@@ -6,6 +6,7 @@ import {
 	GOOGLE_API_SUBJECT
 } from '$env/static/private';
 
+const timeZone = 'Europe/Lisbon';
 const auth = new google.auth.JWT({
 	email: GOOGLE_API_USER,
 	key: GOOGLE_API_KEY,
@@ -14,6 +15,7 @@ const auth = new google.auth.JWT({
 });
 
 export type CalendarEvent = calendar_v3.Schema$Event;
+export type CalendarChannel = calendar_v3.Schema$Channel;
 
 const calendar = google.calendar({ version: 'v3', auth });
 
@@ -27,6 +29,7 @@ export class Calendar {
 			orderBy: 'startTime',
 			timeMin: start?.toISOString(),
 			timeMax: end?.toISOString(),
+			timeZone,
 			privateExtendedProperty: filter
 		});
 
@@ -53,6 +56,18 @@ export class Calendar {
 		return calendar.events.patch({
 			calendarId: this.calendarId,
 			eventId,
+			requestBody
+		});
+	}
+
+	async watchEvents(start: Date, end: Date, requestBody: CalendarChannel) {
+		return calendar.events.watch({
+			calendarId: this.calendarId,
+			singleEvents: true,
+			orderBy: 'startTime',
+			timeMin: start?.toISOString(),
+			timeMax: end?.toISOString(),
+			timeZone,
 			requestBody
 		});
 	}

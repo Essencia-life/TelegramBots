@@ -1,5 +1,10 @@
-import { BOT_GROUP_CHAT_ID, COMMUNITY_CALENDAR_ID, EVENTS_CALENDAR_ID } from '$env/static/private';
-import { type Bot, InlineKeyboard } from 'grammy';
+import {
+	BOT_GROUP_CHAT_ID,
+	COMMUNITY_CALENDAR_ID,
+	EVENTS_CALENDAR_ID,
+	VERCEL_URL
+} from '$env/static/private';
+import { type Bot } from 'grammy';
 import { Calendar, type CalendarEvent } from '$lib/server/calendar';
 import { DateTime } from 'luxon';
 import { type EventPropsJobs } from '$lib/server/week-plan-api';
@@ -13,6 +18,7 @@ const communityCalendar = new Calendar(COMMUNITY_CALENDAR_ID);
 
 export class AgendaBot {
 	constructor(private readonly bot: Bot) {
+		// TODO depracated - remove in next version
 		bot.callbackQuery(/^agenda:(?<date>\d{4}-\d{2}-\d{2}):(?<messageId>\d+)$/, async (ctx) => {
 			if (typeof ctx.match === 'object' && 'groups' in ctx.match) {
 				const date = DateTime.fromISO(ctx.match.groups!.date).setZone(timeZone);
@@ -47,12 +53,7 @@ export class AgendaBot {
 				}
 			);
 
-			await this.bot.api.editMessageReplyMarkup(BOT_GROUP_CHAT_ID, message.message_id, {
-				reply_markup: new InlineKeyboard().text(
-					'🔁️ Refresh',
-					`agenda:${tomorrow.toISODate()}:${message.message_id}`
-				)
-			});
+			await this.watchCalendar(tomorrow, message.message_id);
 		} else {
 			console.info('No agenda for today');
 		}
@@ -67,10 +68,6 @@ export class AgendaBot {
 		try {
 			await this.bot.api.editMessageText(BOT_GROUP_CHAT_ID, messageId, text, {
 				parse_mode: 'HTML',
-				reply_markup: new InlineKeyboard().text(
-					'🔁️ Refresh',
-					`agenda:${date.toISODate()}:${messageId}`
-				),
 				link_preview_options: {
 					is_disabled: true
 				}
@@ -88,6 +85,23 @@ export class AgendaBot {
 		const communityEvents = await communityCalendar.getEvents([], startOfDay, endOfDay);
 
 		return communityEvents.concat(events).sort(byStartDate);
+	}
+
+	private async watchCalendar(date: DateTime, messageId: number) {
+		const startOfDay = date.startOf('day').toJSDate();
+		const endOfDay = date.endOf('day').toJSDate();
+
+		await Promise.all(
+			[communityCalendar, eventsCalendar].map((calendar) =>
+				calendar.watchEvents(startOfDay, endOfDay, {
+					id: crypto.randomUUID(),
+					token: JSON.stringify({ date, messageId }),
+					type: 'webhook',
+					address: `https://${VERCEL_URL}/api/telegram/agenda`,
+					expiration: endOfDay.getTime().toString()
+				})
+			)
+		);
 	}
 }
 
