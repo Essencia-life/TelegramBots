@@ -64,7 +64,7 @@
       "calendar": "community",
       "name": "lunch",
       "title": "\uD83E\uDD58\uFE0F Lunch",
-      "description": "<b>Lunch preparation begins at 11:00.</b>\nFrom this time until 13:00, you lovingly prepare the meal, tend to the dish-washing station and bring the kitchen back into a state of calm and cleanliness.\n\n<b>Lunch cleaning</b> means guiding the leftovers to their next resting place in the fridge and washing the pods and bowls in which the meal was shared.\n\n⚠\uFE0F Plates and cutlery find their way back to clarity through the hands of those who enjoyed the meal at the dish-washing station!\n\n<b>A meal costs 10€ per person per day</b>, unless you are volunteering or have offered 2 hours of service for Essência on that day.\n\uD83D\uDCD5\uFE0F Please write your name into the red lunch book and make your contribution at the end of the week (or on the day of your departure, if you leave earlier) to our Lakshmi fairy, <a href=\"tg://user?id=5637146678\">Eirune</a>.",
+      "description": "<b>Lunch preparation begins at 11:00.</b>\nFrom this time until 13:00, you lovingly prepare the meal and afterwards bring the kitchen back into a state of calm and cleanliness.\n\n<b>Lunch cleaning</b> means prepare the dishwash station before and after lunch guiding the leftovers to their next resting place in the fridge and washing the pods and bowls in which the meal was shared.\n\n⚠\uFE0F Plates and cutlery find their way back to clarity through the hands of those who enjoyed the meal at the dish-washing station!\n\n<b>A meal for guests costs 10€ per person per day</b>, unless you are volunteering or have offered 2 hours of service for Essência on that day.\n\uD83D\uDCD5\uFE0F Please write your name into the red lunch book and make your contribution at the end of the week (or on the day of your departure, if you leave earlier) to our Lakshmi fairy, <a href=\"tg://user?id=5637146678\">Eirune</a>.",
       "location": "Forest SPA",
       "startTime": {
         "hour": 13,
@@ -82,11 +82,6 @@
         5
       ],
       "jobs": [
-        {
-          "name": "chef",
-          "title": "Lunch Chef",
-          "persons": 2
-        },
         {
           "name": "cleaning",
           "title": "Lunch Cleaning",
