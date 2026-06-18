@@ -27,22 +27,22 @@ function itemRow(item: Item) {
 	let row = '';
 
 	if (item.checked) {
-		row += `\n\u200A\u2713\u2004<s>${text}</s>`;
+		row += `<input type="checkbox" checked><s>${text}</s>`;
 	} else {
-		row += `\n\u3007 ${text}`;
+		row += `<input type="checkbox">${text}`;
 	}
 
 	if (item.personal) {
-		row += ` <a href="tg://user?id=${item.added.by.id}">\uFE6B${item.added.by.name}</a>`;
+		row += ` \u200B <mark><a href="tg://user?id=${item.added.by.id}">\uFE6B${item.added.by.name}</a></mark>`;
 	}
 
-	return row;
+	return `<li>${row}</li>`;
 }
 
 function category(category: Category) {
 	if (category.items.length > 0) {
 		const items = category.items.reduce(formatAs(itemRow), '');
-		return `<b>${category.emoji} ${category.label}</b><blockquote>${items}</blockquote>\n\n`;
+		return `<details open><summary><b>${category.emoji} ${category.label}</b></summary><ul>${items}</ul></details>\n\n`;
 	}
 
 	return '';

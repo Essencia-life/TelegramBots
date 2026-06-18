@@ -66,9 +66,7 @@ export async function updateLastMessage(complete?: boolean, newList?: boolean) {
 		if (complete) {
 			if (newList) {
 				const list = await listService.getCompletedList();
-				await bot.api.editMessageText(BOT_GROUP_CHAT_ID, lastMessageId, shoppingList(list), {
-					parse_mode: 'HTML'
-				});
+				await bot.api.editMessageText(BOT_GROUP_CHAT_ID, lastMessageId, { html: shoppingList(list) });
 			} else {
 				await bot.api.editMessageReplyMarkup(BOT_GROUP_CHAT_ID, lastMessageId);
 			}
@@ -86,8 +84,7 @@ export async function updateLastMessage(complete?: boolean, newList?: boolean) {
 			}
 
 			// FIXME: causes 400: Bad Request: message is not modified - if checked more than one in short time
-			await bot.api.editMessageText(BOT_GROUP_CHAT_ID, lastMessageId, shoppingList(list), {
-				parse_mode: 'HTML',
+			await bot.api.editMessageText(BOT_GROUP_CHAT_ID, lastMessageId, { html: shoppingList(list) }, {
 				reply_markup: await getInlineKeyboard()
 			});
 		}
@@ -100,9 +97,8 @@ export async function sendNewList() {
 	console.log('sendNewList');
 
 	const list = await listService.getList();
-	const { message_id } = await bot.api.sendMessage(BOT_GROUP_CHAT_ID, shoppingList(list), {
+	const { message_id } = await bot.api.sendRichMessage(BOT_GROUP_CHAT_ID, { html: shoppingList(list) }, {
 		message_thread_id: parseInt(BOT_TOPIC_ID),
-		parse_mode: 'HTML',
 		reply_markup: await getInlineKeyboard()
 	});
 
