@@ -2,7 +2,7 @@ import {
 	BOT_GROUP_CHAT_ID,
 	COMMUNITY_CALENDAR_ID,
 	EVENTS_CALENDAR_ID,
-	VERCEL_URL
+	VERCEL_BRANCH_URL
 } from '$env/static/private';
 import { type Bot } from 'grammy';
 import { Calendar, type CalendarEvent } from '$lib/server/calendar';
@@ -97,7 +97,7 @@ export class AgendaBot {
 					id: crypto.randomUUID(),
 					token: JSON.stringify({ date, messageId }),
 					type: 'webhook',
-					address: `https://${VERCEL_URL}/api/telegram/agenda`,
+					address: `https://${VERCEL_BRANCH_URL}/api/telegram/agenda`,
 					expiration: endOfDay.getTime().toString()
 				})
 			)
