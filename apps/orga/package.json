@@ -26,7 +26,7 @@
 		"@sveltejs/adapter-auto": "^7.0.1",
 		"@sveltejs/kit": "^2.55.0",
 		"@sveltejs/vite-plugin-svelte": "^7.0.0",
-		"@sveltia/cms": "^0.164.1",
+		"@sveltia/cms": "^0.167.3",
 		"@tailwindcss/vite": "^4.2.2",
 		"@twa-dev/sdk": "^8.0.2",
 		"@types/node": "^24.12.0",
