@@ -81,31 +81,6 @@
 	function refreshInterval() {
 		refreshIntervalInstance = window.setInterval(() => getList().refresh(), 30_000);
 	}
-
-	async function completeListConfirm() {
-		const list = await getList();
-		const completeConfirmed = await new Promise((resolve) =>
-			WebApp.showConfirm('Complete shopping list?', resolve)
-		);
-		if (!completeConfirmed) {
-			return;
-		}
-		if (list.some((category) => category.items.some((item) => !item.checked))) {
-			const newList = await new Promise((resolve) =>
-				WebApp.showConfirm('Move open items to new list?', resolve)
-			);
-			if (newList) {
-				await completeList(true);
-				await deleteCheckedListItems();
-				await sendNewList();
-				WebApp.close();
-				return;
-			}
-		}
-		await completeList(false);
-		await clearLists();
-		WebApp.close();
-	}
 </script>
 
 {#snippet loading()}
@@ -128,7 +103,7 @@
 	{/snippet}
 
 	{#if ready}
-		<main class="mt-2 flex flex-1 flex-col gap-4 overflow-auto">
+		<main class="flex flex-1 flex-col gap-4 overflow-auto">
 			{#each await getList() as category (category.id)}
 				<ListCategory {category} />
 			{:else}
@@ -138,10 +113,6 @@
 				</p>
 			{/each}
 		</main>
-
-		<div class="py-3">
-			<Button class="w-full" onclick={completeListConfirm}>Complete Shopping List</Button>
-		</div>
 
 		{@render children?.()}
 	{:else}
