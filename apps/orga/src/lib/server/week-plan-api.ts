@@ -80,7 +80,7 @@ export interface EventProps {
 
 export type EventPropsJobs = Record<
 	string,
-	{ persons: TelegramUser[]; title: string; details: string }
+	{ persons: TelegramUser[]; title: string; details?: string }
 >;
 
 class WeekPlanApi {
@@ -227,6 +227,10 @@ class WeekPlanApi {
 
 		if (index > -1) {
 			assignedJobs[jobName].persons.splice(index, 1);
+
+			if (assignedJobs[jobName].persons.length === 0) {
+				delete assignedJobs[jobName].details;
+			}
 
 			return calendar.updateEvent(eventId, {
 				extendedProperties: {
