@@ -1,5 +1,5 @@
 import type { TelegramUser } from '$lib/server/db/users.ts';
-import calendar, { type CalendarEvent } from '$lib/server/calendar';
+import { Calendar, type CalendarEvent } from '$lib/server/calendar';
 import { DateTime } from 'luxon';
 import weeklyJobs from '$lib/config/weekly-jobs.json';
 import {
@@ -9,6 +9,7 @@ import {
 } from '$lib/utils/lunar-matching';
 import lunarProvider, { type MoonPhase } from '$lib/utils/lunar-provider';
 import type { calendar_v3 } from 'googleapis';
+import { COMMUNITY_CALENDAR_ID, EVENTS_CALENDAR_ID } from '$env/static/private';
 
 const timeZone = 'Europe/Lisbon';
 const configs = weeklyJobs.config as WeeklyJobsConfigs;
@@ -60,6 +61,8 @@ interface MoonCycleJobConfig extends BaseJobConfig {
 type WeeklyJobsConfig = DailyJobConfig | WeeklyJobConfig | MoonCycleJobConfig;
 export type WeeklyJobsConfigs = WeeklyJobsConfig[];
 
+type CalendarNames = 'community' | 'events';
+
 const locationRoomMapping = new Map<string, calendar_v3.Schema$EventAttendee>([
 	[
 		'Shala',
@@ -70,6 +73,11 @@ const locationRoomMapping = new Map<string, calendar_v3.Schema$EventAttendee>([
 		{ email: 'c_1889c1tchb404ha0ilqe71f97m3ua@resource.calendar.google.com', resource: true }
 	]
 ]);
+
+export const calendarByName: Record<CalendarNames, Calendar> = {
+	community: new Calendar(COMMUNITY_CALENDAR_ID),
+	events: new Calendar(EVENTS_CALENDAR_ID)
+};
 
 export interface EventProps {
 	source: 'week-plan';
@@ -87,13 +95,16 @@ class WeekPlanApi {
 	async createEvents(weekStart: DateTime) {
 		console.info('Create events', weekStart);
 
-		const events = [];
+		const eventsByCalendarName: Record<CalendarNames, CalendarEvent[]> = {
+			community: [],
+			events: []
+		};
 
 		for (const config of configs) {
 			if (config.type === 'weekly') {
 				const weekEnd = weekStart.plus({ days: 5 });
 
-				events.push({
+				eventsByCalendarName[config.calendar].push({
 					summary: config.title,
 					description: config.description,
 					start: { date: weekStart.toISODate(), timeZone },
@@ -150,7 +161,7 @@ class WeekPlanApi {
 							}
 						}
 
-						events.push(event);
+						eventsByCalendarName[config.calendar].push(event);
 					}
 				}
 			}
@@ -159,35 +170,58 @@ class WeekPlanApi {
 		// TODO get existing events of calendars with source=week-plan filter
 		// TODO update events in calendars
 
-		for (const event of events) {
-			console.info('Create event ', event.summary, event.start!.date);
-			const response = await calendar.insertEvent(event);
-			Object.assign(event, response.data);
+		for (const [calendarName, events] of Object.entries(eventsByCalendarName)) {
+			for (const event of events) {
+				console.info('Create event ', event.summary, event.start!.date);
+				const response = await calendarByName[calendarName as CalendarNames].insertEvent(event);
+				Object.assign(event, response.data);
+			}
 		}
 
-		return events;
+		return Object.values(eventsByCalendarName).flat();
 	}
 
 	async getWeekEvents(weekStart: DateTime) {
 		const weekEnd = weekStart.plus({ days: 5 });
-		return calendar.getEvents(
-			['source=week-plan'],
-			weekStart.startOf('day').toJSDate(),
-			weekEnd.endOf('day').toJSDate()
+		const eventsPerCalendar = await Promise.all(
+			Object.values(calendarByName).map((calendar) =>
+				calendar.getEvents(
+					['source=week-plan'],
+					weekStart.startOf('day').toJSDate(),
+					weekEnd.endOf('day').toJSDate()
+				)
+			)
 		);
+
+		return eventsPerCalendar.flat();
 	}
 
 	async getEventsByPlanMessageId(messageId: number) {
-		return calendar.getEvents([`planMessageId=${messageId}`]);
+		const eventsPerCalendar = await Promise.all(
+			Object.values(calendarByName).map((calendar) =>
+				calendar.getEvents([`planMessageId=${messageId}`])
+			)
+		);
+		return eventsPerCalendar.flat();
 	}
 
 	async getEventsProps(eventId: string) {
-		const event = await calendar.getEvent(eventId);
-		return event.extendedProperties!.private as unknown as EventProps;
+		for (const calendar of Object.values(calendarByName)) {
+			try {
+				const event = await calendar.getEvent(eventId);
+				return event.extendedProperties!.private as unknown as EventProps;
+			} catch {
+				// Not found?
+			}
+		}
+
+		throw new Error(`Event with id ${eventId} was not found.`);
 	}
 
-	async setPlanMessageId(eventId: string, messageId: number) {
-		return calendar.updateEvent(eventId, {
+	async setPlanMessageId(configName: string, eventId: string, messageId: number) {
+		const config = configs.find((item) => item.name === configName)!;
+
+		return calendarByName[config.calendar].updateEvent(eventId, {
 			extendedProperties: {
 				private: {
 					planMessageId: messageId.toString()
@@ -197,6 +231,7 @@ class WeekPlanApi {
 	}
 
 	async assignToJob(
+		configName: string,
 		eventId: string,
 		assignedJobs: EventPropsJobs,
 		jobName: string,
@@ -206,7 +241,9 @@ class WeekPlanApi {
 
 		assignedJobs[jobName].persons.push(user);
 
-		return calendar.updateEvent(eventId, {
+		const config = configs.find((item) => item.name === configName)!;
+
+		return calendarByName[config.calendar].updateEvent(eventId, {
 			extendedProperties: {
 				private: {
 					jobs: JSON.stringify(assignedJobs)
@@ -216,6 +253,7 @@ class WeekPlanApi {
 	}
 
 	async unassignFromJob(
+		configName: string,
 		eventId: string,
 		assignedJobs: EventPropsJobs,
 		jobName: string,
@@ -232,7 +270,9 @@ class WeekPlanApi {
 				delete assignedJobs[jobName].details;
 			}
 
-			return calendar.updateEvent(eventId, {
+			const config = configs.find((item) => item.name === configName)!;
+
+			return calendarByName[config.calendar].updateEvent(eventId, {
 				extendedProperties: {
 					private: {
 						jobs: JSON.stringify(assignedJobs)
@@ -242,10 +282,18 @@ class WeekPlanApi {
 		}
 	}
 
-	async addJobDetails(eventId: any, assignedJobs: any, jobName: any, details: string) {
+	async addJobDetails(
+		configName: string,
+		eventId: any,
+		assignedJobs: any,
+		jobName: any,
+		details: string
+	) {
 		assignedJobs[jobName].details = details;
 
-		return calendar.updateEvent(eventId, {
+		const config = configs.find((item) => item.name === configName)!;
+
+		return calendarByName[config.calendar].updateEvent(eventId, {
 			extendedProperties: {
 				private: {
 					jobs: JSON.stringify(assignedJobs)

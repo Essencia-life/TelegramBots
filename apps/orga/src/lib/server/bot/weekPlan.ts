@@ -42,7 +42,11 @@ export class WeekPlanBot {
 			}
 
 			for (const event of events) {
-				await weekPlanApi.setPlanMessageId(event.id!, message.message_id);
+				await weekPlanApi.setPlanMessageId(
+					event.extendedProperties!.private!.type,
+					event.id!,
+					message.message_id
+				);
 			}
 		}
 
@@ -162,7 +166,13 @@ export class WeekPlanBot {
 					if (assignedJob.persons.some((person) => person.id === user.id)) {
 						console.info(`Remove ${user.first_name} from ${jobName}`);
 
-						await weekPlanApi.unassignFromJob(eventId, assignedJobs, jobName, user);
+						await weekPlanApi.unassignFromJob(
+							eventProps.type,
+							eventId,
+							assignedJobs,
+							jobName,
+							user
+						);
 						await this.updateWeekPlanDay(messageId);
 
 						return ctx.answerCallbackQuery({ text: '❎ you removed yourself' });
@@ -178,7 +188,7 @@ export class WeekPlanBot {
 					}
 				}
 
-				await weekPlanApi.assignToJob(eventId, assignedJobs, jobName, user);
+				await weekPlanApi.assignToJob(eventProps.type, eventId, assignedJobs, jobName, user);
 				await this.updateWeekPlanDay(messageId);
 
 				return ctx.answerCallbackQuery({ text: "✅ you've signed up" });
@@ -223,7 +233,7 @@ export class WeekPlanBot {
 					);
 				}
 
-				await weekPlanApi.assignToJob(eventId, assignedJobs, jobName, user);
+				await weekPlanApi.assignToJob(eventProps.type, eventId, assignedJobs, jobName, user);
 				await this.updateWeekPlanDay(messageId);
 
 				await ctx.reply(`${askDetailsReply(config?.title ?? jobName)}\n\n#${eventId}_${jobName}`, {
@@ -250,7 +260,7 @@ export class WeekPlanBot {
 
 			console.info('Save practise', { messageId, eventId, details });
 
-			await weekPlanApi.addJobDetails(eventId, assignedJobs, jobName, details);
+			await weekPlanApi.addJobDetails(eventProps.type, eventId, assignedJobs, jobName, details);
 			await this.updateWeekPlanDay(messageId);
 
 			await ctx.react('👍');

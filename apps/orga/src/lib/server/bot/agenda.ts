@@ -1,40 +1,15 @@
-import {
-	BOT_GROUP_CHAT_ID,
-	COMMUNITY_CALENDAR_ID,
-	EVENTS_CALENDAR_ID,
-	VERCEL_BRANCH_URL
-} from '$env/static/private';
+import { BOT_GROUP_CHAT_ID, VERCEL_BRANCH_URL } from '$env/static/private';
 import { type Bot } from 'grammy';
-import { Calendar, type CalendarEvent } from '$lib/server/calendar';
+import { type CalendarEvent } from '$lib/server/calendar';
 import { DateTime } from 'luxon';
-import { type EventPropsJobs } from '$lib/server/week-plan-api';
+import { calendarByName, type EventPropsJobs } from '$lib/server/week-plan-api';
 import { formatTelegramUsers } from '$lib/server/bot/weekPlan';
 import topics from '$lib/utils/topics';
 
 const timeZone = 'Europe/Lisbon';
 
-const eventsCalendar = new Calendar(EVENTS_CALENDAR_ID);
-const communityCalendar = new Calendar(COMMUNITY_CALENDAR_ID);
-
 export class AgendaBot {
-	constructor(private readonly bot: Bot) {
-		// TODO depracated - remove in next version
-		bot.callbackQuery(/^agenda:(?<date>\d{4}-\d{2}-\d{2}):(?<messageId>\d+)$/, async (ctx) => {
-			if (typeof ctx.match === 'object' && 'groups' in ctx.match) {
-				const date = DateTime.fromISO(ctx.match.groups!.date).setZone(timeZone);
-				const messageId = parseInt(ctx.match.groups!.messageId);
-
-				try {
-					await this.updateAgenda(date, messageId);
-					await this.bot.api.answerCallbackQuery(ctx.callbackQuery.id);
-				} catch (err) {
-					console.error(err);
-				}
-
-				await ctx.answerCallbackQuery();
-			}
-		});
-	}
+	constructor(private readonly bot: Bot) {}
 
 	public async sendAgenda() {
 		const tomorrow = DateTime.now().setZone(timeZone).plus({ day: 1 });
@@ -81,10 +56,11 @@ export class AgendaBot {
 		const startOfDay = date.startOf('day').toJSDate();
 		const endOfDay = date.endOf('day').toJSDate();
 
-		const events = await eventsCalendar.getEvents([], startOfDay, endOfDay);
-		const communityEvents = await communityCalendar.getEvents([], startOfDay, endOfDay);
+		const eventsPerCalendar = await Promise.all(
+			Object.values(calendarByName).map((calendar) => calendar.getEvents([], startOfDay, endOfDay))
+		);
 
-		return communityEvents.concat(events).sort(byStartDate);
+		return eventsPerCalendar.flat().sort(byStartDate);
 	}
 
 	private async watchCalendar(date: DateTime, messageId: number) {
@@ -92,7 +68,7 @@ export class AgendaBot {
 		const endOfDay = date.endOf('day').toJSDate();
 
 		await Promise.all(
-			[communityCalendar, eventsCalendar].map((calendar) =>
+			Object.values(calendarByName).map((calendar) =>
 				calendar.watchEvents(startOfDay, endOfDay, {
 					id: crypto.randomUUID(),
 					token: JSON.stringify({ date, messageId }),
