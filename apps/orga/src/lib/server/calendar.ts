@@ -72,8 +72,3 @@ export class Calendar {
 		});
 	}
 }
-
-/**
- * @deprecated initialize Calendar class instead
- */
-export default new Calendar(COMMUNITY_CALENDAR_ID);
