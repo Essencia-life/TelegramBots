@@ -8,7 +8,7 @@ const metaFields: Field[] = [
 		name: 'description',
 		label: 'Description',
 		widget: 'text',
-		required: false,
+		required: false
 	},
 	{ name: 'location', label: 'Location', required: false }
 ];

@@ -1,10 +1,11 @@
 import { BOT_GROUP_CHAT_ID, VERCEL_BRANCH_URL } from '$env/static/private';
-import { type Bot } from 'grammy';
+import { InlineKeyboard, type Bot } from 'grammy';
 import { type CalendarEvent } from '$lib/server/calendar';
 import { DateTime } from 'luxon';
 import { calendarByName, type EventPropsJobs } from '$lib/server/week-plan-api';
 import { formatTelegramUsers } from '$lib/server/bot/weekPlan';
 import topics from '$lib/utils/topics';
+import type { InlineKeyboardMarkup } from 'grammy/types';
 
 const timeZone = 'Europe/Lisbon';
 
@@ -13,20 +14,20 @@ export class AgendaBot {
 
 	public async sendAgenda() {
 		const tomorrow = DateTime.now().setZone(timeZone).plus({ day: 1 });
-		const tomorrowEvents = await this.getEventsByDate(tomorrow);
+		const events = await this.getEventsByDate(tomorrow);
 
-		if (tomorrowEvents.length) {
-			const message = await this.bot.api.sendMessage(
-				BOT_GROUP_CHAT_ID,
-				formatAgenda(tomorrow.toJSDate(), tomorrowEvents),
-				{
-					parse_mode: 'HTML',
-					message_thread_id: topics.dailyInfo,
-					link_preview_options: {
-						is_disabled: true
-					}
+		if (events.length) {
+			const text = formatAgenda(tomorrow.toJSDate(), events);
+			const keyboard = generateAvailableJobButtons(events);
+
+			const message = await this.bot.api.sendMessage(BOT_GROUP_CHAT_ID, text, {
+				parse_mode: 'HTML',
+				reply_markup: keyboard,
+				message_thread_id: topics.dailyInfo,
+				link_preview_options: {
+					is_disabled: true
 				}
-			);
+			});
 
 			await this.watchCalendar(tomorrow, message.message_id);
 		} else {
@@ -39,10 +40,12 @@ export class AgendaBot {
 
 		const events = await this.getEventsByDate(date);
 		const text = formatAgenda(date.toJSDate(), events);
+		const keyboard = generateAvailableJobButtons(events);
 
 		try {
 			await this.bot.api.editMessageText(BOT_GROUP_CHAT_ID, messageId, text, {
 				parse_mode: 'HTML',
+				reply_markup: keyboard,
 				link_preview_options: {
 					is_disabled: true
 				}
@@ -178,4 +181,27 @@ function formatAgenda(date: Date, events: CalendarEvent[]) {
 	return `🗓️ <b>Agenda for ${date.toLocaleDateString('en', { weekday: 'long' })}</b>
 
 ${events.map(formatEvent).join('\n\n')}`;
+}
+
+function generateAvailableJobButtons(events: CalendarEvent[]): InlineKeyboardMarkup {
+	let keyboard = new InlineKeyboard();
+
+	for (const event of events) {
+		// Skip weekly tasks
+		if (!event.start?.dateTime) {
+			continue;
+		}
+
+		const assignedJobs: EventPropsJobs = JSON.parse(
+			event.extendedProperties?.private?.jobs ?? '{}'
+		);
+
+		for (const [jobName, { title, persons }] of Object.entries(assignedJobs)) {
+			if (persons.length === 0) {
+				keyboard = keyboard.row().text(`🆘 I will do ${title} on ${new Date(event.start?.dateTime).toLocaleDateString('en', { weekday: 'long' })}!`, `plan:${event.id}:${jobName}`);
+			}
+		}
+	}
+
+	return keyboard;
 }
