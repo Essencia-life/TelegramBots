@@ -7,9 +7,10 @@ const metaFields: Field[] = [
 	{
 		name: 'description',
 		label: 'Description',
-		widget: 'text'
+		widget: 'text',
+		required: false,
 	},
-	{ name: 'location', label: 'Location' }
+	{ name: 'location', label: 'Location', required: false }
 ];
 
 const timeFields: Field[] = [
@@ -38,6 +39,7 @@ const jobsField: Field = {
 	label: 'Jobs',
 	label_singular: 'Job',
 	widget: 'list',
+	collapsed: true,
 	min: 1,
 	summary: '{{title}}',
 	fields: [
@@ -58,6 +60,7 @@ export default {
 			label: 'Weekly Jobs',
 			label_singular: 'Job',
 			widget: 'list',
+			collapsed: true,
 			types: [
 				{
 					name: 'daily',
