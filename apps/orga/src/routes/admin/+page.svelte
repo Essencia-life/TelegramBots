@@ -1,7 +1,10 @@
-<script>
+<script lang="ts">
 	import { resolve } from '$app/paths';
 	import weeklyJobs from '$lib/config/weekly-jobs';
 	import { onMount } from 'svelte';
+	import type { PageProps } from './$types';
+
+	const { data }: PageProps = $props();
 
 	onMount(async () => {
 		const { init } = await import('@sveltia/cms');
@@ -12,6 +15,7 @@
 					name: 'github',
 					repo: 'Essencia-life/TelegramBots',
 					branch: 'main',
+					base_url: `https://${data.baseUrl}`,
 					auth_endpoint: resolve('/admin/auth'),
 					commit_messages: {
 						create: 'feat({{collection}}): created “{{slug}}”',
