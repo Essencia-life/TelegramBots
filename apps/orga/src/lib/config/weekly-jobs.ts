@@ -46,7 +46,8 @@ const jobsField: Field = {
 		{ name: 'name', label: 'Name' },
 		{ name: 'title', label: 'title' },
 		{ name: 'persons', label: 'Persons', widget: 'number', min: 1, max: 2 },
-		{ name: 'askDetails', label: 'Ask for details', widget: 'boolean' }
+		{ name: 'askDetails', label: 'Ask for details?', widget: 'boolean' },
+		{ name: 'reminder', label: 'Send reminder?', widget: 'boolean' }
 	]
 };
 

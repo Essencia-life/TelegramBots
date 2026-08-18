@@ -197,8 +197,14 @@ function generateAvailableJobButtons(events: CalendarEvent[]): InlineKeyboardMar
 		);
 
 		for (const [jobName, { title, persons }] of Object.entries(assignedJobs)) {
-			if (persons.length === 0) {
-				keyboard = keyboard.row().text(`🆘 I will do ${title} on ${new Date(event.start?.dateTime).toLocaleDateString('en', { weekday: 'long' })}!`, `plan:${event.id}:${jobName}`);
+			// TODO replace manual jobName check with reminder boolean from job config
+			if (persons.length === 0 && jobName !== 'guide') {
+				keyboard = keyboard
+					.row()
+					.text(
+						`🆘 I will do ${title} on ${new Date(event.start?.dateTime).toLocaleDateString('en', { weekday: 'long' })}!`,
+						`plan:${event.id}:${jobName}`
+					);
 			}
 		}
 	}
