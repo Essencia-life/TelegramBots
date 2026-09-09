@@ -1,0 +1,213 @@
+import { ORGA_BOT_GROUP_CHAT_ID, VERCEL_BRANCH_URL } from '$env/static/private';
+import { InlineKeyboard, type Bot } from 'grammy';
+import { type CalendarEvent } from '$lib/server/calendar';
+import { DateTime } from 'luxon';
+import { calendarByName, type EventPropsJobs } from '../week-plan-api';
+import { formatTelegramUsers } from './weekPlan';
+import topics from '../utils/topics';
+import type { InlineKeyboardMarkup } from 'grammy/types';
+
+const timeZone = 'Europe/Lisbon';
+
+export class AgendaBot {
+	constructor(private readonly bot: Bot) {}
+
+	public async sendAgenda() {
+		const tomorrow = DateTime.now().setZone(timeZone).plus({ day: 1 });
+		const events = await this.getEventsByDate(tomorrow);
+
+		if (events.length) {
+			const text = formatAgenda(tomorrow.toJSDate(), events);
+			const keyboard = generateAvailableJobButtons(events);
+
+			const message = await this.bot.api.sendMessage(ORGA_BOT_GROUP_CHAT_ID, text, {
+				parse_mode: 'HTML',
+				reply_markup: keyboard,
+				message_thread_id: topics.dailyInfo,
+				link_preview_options: {
+					is_disabled: true
+				}
+			});
+
+			await this.watchCalendar(tomorrow, message.message_id);
+		} else {
+			console.info('No agenda for today');
+		}
+	}
+
+	public async updateAgenda(date: DateTime, messageId: number) {
+		console.info(`Update agenda for date=${date.toISODate()} messageId=${messageId}`);
+
+		const events = await this.getEventsByDate(date);
+		const text = formatAgenda(date.toJSDate(), events);
+		const keyboard = generateAvailableJobButtons(events);
+
+		try {
+			await this.bot.api.editMessageText(ORGA_BOT_GROUP_CHAT_ID, messageId, text, {
+				parse_mode: 'HTML',
+				reply_markup: keyboard,
+				link_preview_options: {
+					is_disabled: true
+				}
+			});
+		} catch (err) {
+			console.error(err);
+		}
+	}
+
+	private async getEventsByDate(date: DateTime) {
+		const startOfDay = date.startOf('day').toJSDate();
+		const endOfDay = date.endOf('day').toJSDate();
+
+		const eventsPerCalendar = await Promise.all(
+			Object.values(calendarByName).map((calendar) => calendar.getEvents([], startOfDay, endOfDay))
+		);
+
+		return eventsPerCalendar.flat().sort(byStartDate);
+	}
+
+	private async watchCalendar(date: DateTime, messageId: number) {
+		const startOfDay = date.startOf('day').toJSDate();
+		const endOfDay = date.endOf('day').toJSDate();
+
+		await Promise.all(
+			Object.values(calendarByName).map((calendar) =>
+				calendar.watchEvents(startOfDay, endOfDay, {
+					id: crypto.randomUUID(),
+					token: JSON.stringify({ date, messageId }),
+					type: 'webhook',
+					address: `https://${VERCEL_BRANCH_URL}/api/telegram/agenda`,
+					expiration: endOfDay.getTime().toString()
+				})
+			)
+		);
+	}
+}
+
+function transformDescription(description: string): string {
+	return (
+		'\n' +
+		description
+			.replaceAll(/<(br|\/li|\/ul)>/g, '\n')
+			.replaceAll('<li>', '• ')
+			.replaceAll('<ul>', '')
+	);
+}
+
+function formatLocation(location?: string | null) {
+	return location ? `<i>\uFE6B${location.replace(/^(\w+)-\d+-\1 \(\d+\)$/, '$1')}</i>` : '';
+}
+
+function formatDuration(event: CalendarEvent) {
+	if (!event.start?.dateTime || !event.end?.dateTime) return '';
+
+	const start = DateTime.fromISO(event.start.dateTime);
+	const end = DateTime.fromISO(event.end.dateTime);
+
+	const dur = end.diff(start).shiftTo('hours', 'minutes');
+
+	const h = Math.floor(dur.hours);
+	const m = Math.round(dur.minutes);
+
+	const parts = [];
+
+	if (h) parts.push(`${h}h`);
+	if (m) parts.push(`${m}m`);
+
+	return parts.length ? `(${parts.join(' ')})` : '';
+}
+
+function formatJobs(eventProps?: Record<string, string>) {
+	console.log(eventProps);
+	if (eventProps && eventProps.jobs) {
+		const assignedJobs: EventPropsJobs = JSON.parse(eventProps.jobs);
+		const block = [];
+
+		for (const { title, persons, details } of Object.values(assignedJobs)) {
+			console.log(title, details);
+			if (!details) {
+				block.push(`${title}: ${formatTelegramUsers(persons)}`);
+			} else {
+				const [firstLine, rest] = details.split('\n', 2);
+
+				if (!rest) {
+					block.push(`${title}: ${firstLine} with ${formatTelegramUsers(persons)}`);
+				} else {
+					block.push(`${title}: ${firstLine} with ${formatTelegramUsers(persons)}`);
+					block.push(rest);
+				}
+			}
+		}
+
+		return block.join('\n');
+	}
+
+	return '';
+}
+
+function formatEvent(event: CalendarEvent): string {
+	const firstLine = [event.summary];
+
+	if (event.start?.dateTime) {
+		const time = DateTime.fromISO(event.start.dateTime)
+			.setZone(event.start.timeZone!)
+			.setLocale('en')
+			.toLocaleString({
+				hour12: false,
+				hour: '2-digit',
+				minute: '2-digit'
+			});
+		firstLine.unshift(`<b>${time}</b>`);
+		firstLine.push(formatDuration(event));
+	}
+
+	const lines = [
+		firstLine.join(' '),
+		formatLocation(event.location),
+		formatJobs(event.extendedProperties?.private),
+		transformDescription(event.description ?? '')
+	].filter(Boolean);
+
+	return `<blockquote expandable>${lines.join('\n')}</blockquote>`;
+}
+
+function byStartDate(a: CalendarEvent, b: CalendarEvent) {
+	return (
+		Date.parse(a.start?.dateTime ?? '2222-12-22') - Date.parse(b.start?.dateTime ?? '2222-12-22')
+	);
+}
+
+function formatAgenda(date: Date, events: CalendarEvent[]) {
+	return `🗓️ <b>Agenda for ${date.toLocaleDateString('en', { weekday: 'long' })}</b>
+
+${events.map(formatEvent).join('\n\n')}`;
+}
+
+function generateAvailableJobButtons(events: CalendarEvent[]): InlineKeyboardMarkup {
+	let keyboard = new InlineKeyboard();
+
+	for (const event of events) {
+		// Skip weekly tasks
+		if (!event.start?.dateTime) {
+			continue;
+		}
+
+		const assignedJobs: EventPropsJobs = JSON.parse(
+			event.extendedProperties?.private?.jobs ?? '{}'
+		);
+
+		for (const [jobName, { title, persons }] of Object.entries(assignedJobs)) {
+			// TODO replace manual jobName check with reminder boolean from job config
+			if (persons.length === 0 && jobName !== 'guide') {
+				keyboard = keyboard
+					.row()
+					.text(
+						`🆘 I will do ${title} on ${new Date(event.start?.dateTime).toLocaleDateString('en', { weekday: 'long' })}!`,
+						`plan:${event.id}:${jobName}`
+					);
+			}
+		}
+	}
+
+	return keyboard;
+}
