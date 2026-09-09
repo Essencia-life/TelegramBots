@@ -1,0 +1,155 @@
+{
+	"config": [
+		{
+			"type": "daily",
+			"calendar": "community",
+			"name": "meditation",
+			"title": "🧘️ Guided Meditation",
+			"description": "If no one signed up as meditation guide it will be a silent meditation",
+			"location": "Shala",
+			"startTime": {
+				"hour": 6,
+				"minute": 0
+			},
+			"endTime": {
+				"hour": 7,
+				"minute": 0
+			},
+			"weekdays": [3, 5],
+			"jobs": [
+				{
+					"name": "guide",
+					"title": "Guided Meditation",
+					"persons": 1,
+					"askDetails": true
+				}
+			]
+		},
+		{
+			"type": "daily",
+			"calendar": "community",
+			"name": "practice",
+			"title": "🤸 Morning Practice",
+			"description": "",
+			"location": "Shala",
+			"startTime": {
+				"hour": 7,
+				"minute": 0
+			},
+			"endTime": {
+				"hour": 8,
+				"minute": 0
+			},
+			"weekdays": [1, 2, 3, 4, 5],
+			"jobs": [
+				{
+					"name": "facilitator",
+					"title": "Morning Practice",
+					"persons": 1,
+					"askDetails": true
+				}
+			]
+		},
+		{
+			"type": "daily",
+			"calendar": "community",
+			"name": "lunch",
+			"title": "🥘️ Lunch",
+			"description": "<b>Lunch preparation begins at 11:00.</b>\nFrom this time until 13:00, you lovingly prepare the meal, tend to the dish-washing station and bring the kitchen back into a state of calm and cleanliness.\n\n<b>Lunch cleaning</b> means guiding the leftovers to their next resting place in the fridge and washing the pods and bowls in which the meal was shared.\n\n⚠️ Plates and cutlery find their way back to clarity through the hands of those who enjoyed the meal at the dish-washing station!\n\n<b>A meal costs 10€ per person per day</b>, unless you are volunteering or have offered 2 hours of service for Essência on that day.\n📕️ Please write your name into the red lunch book and make your contribution at the end of the week (or on the day of your departure, if you leave earlier) to our Lakshmi fairy, <a href=\"tg://user?id=1264250735\">Niv</a>.",
+			"location": "Forest SPA",
+			"startTime": {
+				"hour": 13,
+				"minute": 0
+			},
+			"endTime": {
+				"hour": 14,
+				"minute": 0
+			},
+			"weekdays": [1, 2, 3, 4, 5],
+			"jobs": [
+				{
+					"name": "chef",
+					"title": "Lunch Chef",
+					"persons": 2
+				},
+				{
+					"name": "cleaning",
+					"title": "Lunch Cleaning",
+					"persons": 1
+				}
+			]
+		},
+		{
+			"type": "daily",
+			"calendar": "events",
+			"name": "spa",
+			"title": "✨️ SPArkling Night",
+			"description": "Join us for a cozy, playful evening of warmth and connection. Enjoy the sauna and hot tub, jump into our natural pond, gather around the campfire and sing together under the night sky. A relaxed night to unwind, connect and let the day fade away.\n\n<b>Contribution is 20€.</b>",
+			"startTime": {
+				"hour": 18,
+				"minute": 0
+			},
+			"endTime": {
+				"hour": 22,
+				"minute": 0
+			},
+			"weekdays": [4],
+			"jobs": [
+				{
+					"name": "pre_cleaning",
+					"title": "Pre SPA Cleaning",
+					"persons": 1
+				},
+				{
+					"name": "fire",
+					"title": "Fire Keeper",
+					"persons": 1
+				},
+				{
+					"name": "soup",
+					"title": "Soup Preparation",
+					"persons": 1
+				},
+				{
+					"name": "lakshmi",
+					"title": "Lakshmi Fairy",
+					"persons": 1
+				},
+				{
+					"name": "post_cleaning",
+					"title": "Post SPA Cleaning",
+					"persons": 1
+				}
+			]
+		},
+		{
+			"type": "weekly",
+			"calendar": "community",
+			"name": "week-fairy",
+			"title": "🧚‍♀️️ Fairy of the Week",
+			"description": "<u>Village Fairy</u>\nDescription is in the fun kitchen\n\n<u>Temple Fairy</u> <i>(Shala)</i>\n<ul><li>Broom inside and outside</li><li>Mop</li><li>Flowers</li><li>Clean Glass</li><li>Nice Altar</li><li>Make sure there is kleenex</li><li>Make sure yoga-mat-spray and microfibres are there</li><li>Smugging</li><li>No things lying around</li><li>Pellet stove works and is programmed</li><li>Water plant</li><li>Sofa nice</li><li>Use the robot in between</li>\n</ul>\n\n<u>Carpet Jinn</u>\n<ul><li>Take away and put carpets</li><li>Put them away after meetings/gatherings</li><li>Protect them from the rain</li>\n</ul><u>Lord of Laundry</u>\n<ul><li>Once per week</li><li>Do the laundry of the kitchen towels and rugs and so on</li></ul>",
+			"jobs": [
+				{
+					"name": "village",
+					"title": "Village Fairy",
+					"persons": 2
+				},
+				{
+					"name": "temple",
+					"title": "Temple Fairy",
+					"persons": 1
+				},
+				{
+					"name": "carpet",
+					"title": "Carpet Jinn 🧞‍♂️",
+					"persons": 1
+				},
+				{
+					"name": "laundry",
+					"title": "Lord of Laundry",
+					"persons": 1
+				}
+			]
+		}
+	]
+}
