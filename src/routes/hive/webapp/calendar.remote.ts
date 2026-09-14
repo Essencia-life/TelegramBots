@@ -11,7 +11,7 @@ export const getBookings = query(z.iso.date(), async (date) => {
 	const endDate = new Date(`${date} 23:59:59:999`);
 
 	const { cookies } = getRequestEvent();
-	const userEncrypted = cookies.get('session');
+	const userEncrypted = cookies.get('hive-session');
 	const user = userEncrypted && decryptParam(userEncrypted);
 
 	if (!user) {
@@ -41,7 +41,7 @@ export const createBooking = command(
 	}),
 	async ({ startDate, endDate, description }) => {
 		const { cookies } = getRequestEvent();
-		const userEncrypted = cookies.get('session');
+		const userEncrypted = cookies.get('hive-session');
 		const user = userEncrypted && decryptParam(userEncrypted);
 
 		if (!user) {
@@ -84,7 +84,7 @@ export const createBooking = command(
 
 export const deleteBooking = command(z.string(), async (id: string) => {
 	const { cookies } = getRequestEvent();
-	const userEncrypted = cookies.get('session');
+	const userEncrypted = cookies.get('hive-session');
 	const user = userEncrypted && decryptParam(userEncrypted);
 
 	if (!user) {
@@ -120,7 +120,7 @@ export const updateBooking = command(
 	}),
 	async ({ id, startDate, endDate, description }) => {
 		const { cookies } = getRequestEvent();
-		const userEncrypted = cookies.get('session');
+		const userEncrypted = cookies.get('hive-session');
 		const user = userEncrypted && decryptParam(userEncrypted);
 
 		if (!user) {
