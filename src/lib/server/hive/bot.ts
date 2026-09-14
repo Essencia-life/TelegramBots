@@ -51,7 +51,7 @@ bot.on('inline_query', async (ctx) => {
 		button: {
 			text: '🗓️ Add and manage my bookings',
 			web_app: {
-				url: `https://${VERCEL_URL}/webapp?user=${encryptParam(ctx.from)}`
+				url: `https://${VERCEL_URL}/hive/webapp?user=${encryptParam(ctx.from)}`
 			}
 		}
 	});
