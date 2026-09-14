@@ -31,11 +31,10 @@
 
 		if (WebApp.initData) {
 			await cookieStore.set({
-				name: 'session',
+				name: 'shopping-session',
 				value: WebApp.initData,
 				expires: WebApp.initDataUnsafe.auth_date * 1000 + ms('23h'),
 				sameSite: 'strict',
-				path: '/shopping'
 			});
 		}
 

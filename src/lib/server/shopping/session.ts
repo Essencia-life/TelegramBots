@@ -12,7 +12,7 @@ interface Session extends Omit<WebAppInitData, 'hash' | 'user'> {
 }
 
 export function getSession(cookies: Cookies): Session {
-	const initData = cookies.get('session');
+	const initData = cookies.get('shopping-session');
 
 	if (!initData) {
 		return error(401, 'Unauthorized');
