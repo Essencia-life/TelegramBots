@@ -24,8 +24,8 @@ export const getBookings = query(z.iso.date(), async (date) => {
 
 export const checkAvailability = command(
 	z.object({
-		startDate: z.iso.date(),
-		endDate: z.iso.date()
+		startDate: z.iso.datetime(),
+		endDate: z.iso.datetime()
 	}),
 	async ({ startDate, endDate }) => {
 		const hiveCalendar = new Calendar(HIVE_CALENDAR_ID);
