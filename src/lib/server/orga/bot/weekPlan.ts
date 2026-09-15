@@ -8,7 +8,7 @@ import weekPlanApi, {
 } from '../week-plan-api';
 import weeklyJobs from '$lib/client/orga/config/weekly-jobs.json';
 import type { TelegramUser } from '../users';
-import { ORGA_BOT_GROUP_CHAT_ID } from '$env/static/private';
+import { BOT_HOME_GROUP_CHAT_ID } from '$env/static/private';
 import topics from '../utils/topics';
 
 const timeZone = 'Europe/Lisbon';
@@ -31,7 +31,7 @@ export class WeekPlanBot {
 
 		for (const [title, events] of groupEvents(allEvents).entries()) {
 			const [plan, keyboard] = this.buildMessage(title, events);
-			const message = await this.bot.api.sendMessage(ORGA_BOT_GROUP_CHAT_ID, plan.join('\n\n'), {
+			const message = await this.bot.api.sendMessage(BOT_HOME_GROUP_CHAT_ID, plan.join('\n\n'), {
 				message_thread_id: topics.weeklyJobs,
 				parse_mode: 'HTML',
 				reply_markup: keyboard
@@ -51,7 +51,7 @@ export class WeekPlanBot {
 		}
 
 		await this.bot.api.sendMessage(
-			ORGA_BOT_GROUP_CHAT_ID,
+			BOT_HOME_GROUP_CHAT_ID,
 			'✍️ Please sign up for the upcoming week before the Monday morning planning meeting by tapping one of the buttons.',
 			{
 				message_thread_id: topics.weeklyJobs,
@@ -68,7 +68,7 @@ export class WeekPlanBot {
 		const [plan, keyboard] = this.buildMessage(title, events);
 
 		try {
-			await this.bot.api.editMessageText(ORGA_BOT_GROUP_CHAT_ID, messageId, plan.join('\n\n'), {
+			await this.bot.api.editMessageText(BOT_HOME_GROUP_CHAT_ID, messageId, plan.join('\n\n'), {
 				parse_mode: 'HTML',
 				reply_markup: keyboard
 			});

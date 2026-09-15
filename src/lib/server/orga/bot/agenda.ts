@@ -1,4 +1,4 @@
-import { ORGA_BOT_GROUP_CHAT_ID, VERCEL_BRANCH_URL } from '$env/static/private';
+import { BOT_HOME_GROUP_CHAT_ID, VERCEL_BRANCH_URL } from '$env/static/private';
 import { InlineKeyboard, type Bot } from 'grammy';
 import { type CalendarEvent } from '$lib/server/calendar';
 import { DateTime } from 'luxon';
@@ -20,7 +20,7 @@ export class AgendaBot {
 			const text = formatAgenda(tomorrow.toJSDate(), events);
 			const keyboard = generateAvailableJobButtons(events);
 
-			const message = await this.bot.api.sendMessage(ORGA_BOT_GROUP_CHAT_ID, text, {
+			const message = await this.bot.api.sendMessage(BOT_HOME_GROUP_CHAT_ID, text, {
 				parse_mode: 'HTML',
 				reply_markup: keyboard,
 				message_thread_id: topics.dailyInfo,
@@ -43,7 +43,7 @@ export class AgendaBot {
 		const keyboard = generateAvailableJobButtons(events);
 
 		try {
-			await this.bot.api.editMessageText(ORGA_BOT_GROUP_CHAT_ID, messageId, text, {
+			await this.bot.api.editMessageText(BOT_HOME_GROUP_CHAT_ID, messageId, text, {
 				parse_mode: 'HTML',
 				reply_markup: keyboard,
 				link_preview_options: {

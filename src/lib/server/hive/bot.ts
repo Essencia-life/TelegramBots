@@ -1,6 +1,6 @@
 import {
-	HIVE_BOT_ADMIN_CHAT_ID,
-	HIVE_BOT_GROUP_CHAT_ID,
+	BOT_ADMIN_CHAT_ID,
+	BOT_HOME_GROUP_CHAT_ID,
 	HIVE_BOT_TOKEN,
 	CO_WORKING_CALENDAR_ID,
 	VERCEL_ENV,
@@ -18,7 +18,7 @@ export const bot = new Bot(HIVE_BOT_TOKEN);
 bot.on('my_chat_member', async (ctx) => {
 	const { status } = ctx.myChatMember.new_chat_member;
 
-	if (status === 'member' && ctx.chatId !== Number(HIVE_BOT_GROUP_CHAT_ID)) {
+	if (status === 'member' && ctx.chatId !== Number(BOT_HOME_GROUP_CHAT_ID)) {
 		console.warn(`Chat Id ${ctx.chatId} is not allowed to use this bot.`);
 		await bot.api.leaveChat(ctx.chatId);
 	}
@@ -129,13 +129,13 @@ export async function updateAgenda(event: CalendarEvent) {
 
 		if (text) {
 			// FIXME message not updated - probably the resource calendar is delayed
-			return bot.api.editMessageText(HIVE_BOT_GROUP_CHAT_ID, messageId, text, {
+			return bot.api.editMessageText(BOT_HOME_GROUP_CHAT_ID, messageId, text, {
 				parse_mode: 'HTML',
 				reply_markup: new InlineKeyboard().switchInlineCurrent('Manage bookings')
 			});
 		}
 
-		return bot.api.deleteMessage(HIVE_BOT_GROUP_CHAT_ID, messageId);
+		return bot.api.deleteMessage(BOT_HOME_GROUP_CHAT_ID, messageId);
 	}
 }
 
@@ -185,4 +185,4 @@ bot.on('chosen_inline_result', async (ctx) => {
 	});
 });
 
-bot.catch(errorHandlerCallback(bot, HIVE_BOT_ADMIN_CHAT_ID));
+bot.catch(errorHandlerCallback(bot, BOT_ADMIN_CHAT_ID));
