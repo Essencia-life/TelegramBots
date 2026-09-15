@@ -26,7 +26,7 @@
 					}
 				},
 				load_config_file: false,
-				media_folder: 'apps/orga/src/lib/assets',
+				media_folder: 'src/lib/assets',
 				public_folder: '',
 				collections: [
 					{
