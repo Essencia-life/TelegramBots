@@ -76,7 +76,7 @@ export class AgendaBot {
 					id: crypto.randomUUID(),
 					token: JSON.stringify({ date, messageId }),
 					type: 'webhook',
-					address: `https://${VERCEL_BRANCH_URL}/api/telegram/agenda`,
+					address: `https://${VERCEL_BRANCH_URL}/orga/api/telegram/agenda`,
 					expiration: endOfDay.getTime().toString()
 				})
 			)
