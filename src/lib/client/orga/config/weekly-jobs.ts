@@ -3,11 +3,20 @@ import type { CollectionFile, Field } from '@sveltia/cms';
 const metaFields: Field[] = [
 	{ name: 'calendar', label: 'Calendar', widget: 'select', options: ['community', 'events'] },
 	{ name: 'name', label: 'Name' },
-	{ name: 'title', label: 'title' },
+	{ name: 'title', label: 'Title' },
 	{
 		name: 'description',
-		label: 'Description',
+		label: 'Event Description',
 		widget: 'text',
+		required: false
+	},
+	{
+		name: 'message',
+		label: 'Message Template',
+		widget: 'code',
+		default_language: 'handlebars',
+		allow_language_selection: false,
+		output_code_only: true,
 		required: false
 	},
 	{ name: 'location', label: 'Location', required: false }
