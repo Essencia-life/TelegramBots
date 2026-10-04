@@ -9,11 +9,11 @@
       "message": "",
       "location": "Shala",
       "startTime": {
-        "hour": 6,
+        "hour": 7,
         "minute": 0
       },
       "endTime": {
-        "hour": 7,
+        "hour": 8,
         "minute": 0
       },
       "weekdays": [
@@ -39,11 +39,11 @@
       "message": "",
       "location": "Shala",
       "startTime": {
-        "hour": 7,
+        "hour": 8,
         "minute": 0
       },
       "endTime": {
-        "hour": 8,
+        "hour": 9,
         "minute": 0
       },
       "weekdays": [
@@ -68,15 +68,15 @@
       "calendar": "community",
       "name": "lunch",
       "title": "🥘️ Lunch",
-      "description": "<b>Lunch preparation begins at 11:00.</b>\nFrom this time until 13:00, you lovingly prepare the meal, tend to the dish-washing station and bring the kitchen back into a state of calm and cleanliness.\n\n<b>Lunch cleaning</b> means guiding the leftovers to their next resting place in the fridge and washing the pods and bowls in which the meal was shared.\n\n⚠️ Plates and cutlery find their way back to clarity through the hands of those who enjoyed the meal at the dish-washing station!\n\n<b>A meal costs 10€ per person per day</b>, unless you are volunteering or have offered 2 hours of service for Essência on that day.\n📕️ Please write your name into the red lunch book and make your contribution at the end of the week (or on the day of your departure, if you leave earlier) to our Lakshmi fairy, <a href=\"tg://user?id=1264250735\">Niv</a>.",
+      "description": "<b>Lunch preparation begins at 11:00.</b>\nFrom this time until 13:00, you lovingly prepare the meal, tend to the dish-washing station and bring the kitchen back into a state of calm and cleanliness.\n\n<b>Lunch cleaning</b> means guiding the leftovers to their next resting place in the fridge and washing the pods and bowls in which the meal was shared.\n\n⚠️ Plates and cutlery find their way back to clarity through the hands of those who enjoyed the meal at the dish-washing station!\n\n<b>A meal costs 10€ per person per day</b>, unless you are volunteering or have offered 2 hours of service for Essência on that day.\n📕️ Please write your name into the red lunch book and make your contribution at the end of the week (or on the day of your departure, if you leave earlier) to our Lakshmi fairy, <a href=\"tg://user?id=2114850869\">Aida</a>.",
       "message": "",
       "location": "Forest SPA",
       "startTime": {
-        "hour": 13,
+        "hour": 14,
         "minute": 0
       },
       "endTime": {
-        "hour": 14,
+        "hour": 15,
         "minute": 0
       },
       "weekdays": [
@@ -112,7 +112,7 @@
       "message": "",
       "location": "",
       "startTime": {
-        "hour": 18,
+        "hour": 19,
         "minute": 0
       },
       "endTime": {
