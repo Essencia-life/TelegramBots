@@ -6,6 +6,10 @@
 			"schedule": "50 18 * * *"
 		},
 		{
+			"path": "/orga/api/telegram/lunch-poll",
+			"schedule": "50 18 * * *"
+		},
+		{
 			"path": "/orga/api/telegram/week-plan",
 			"schedule": "50 10 * * 6"
 		},

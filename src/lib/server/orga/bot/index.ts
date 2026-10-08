@@ -4,6 +4,7 @@ import { UsersBot } from './users';
 import { AgendaBot } from './agenda';
 import { WeekPlanBot } from './weekPlan';
 import { SpamProtectionBot } from './spam-protection';
+import { LunchPollBot } from './lunchPoll';
 import { errorHandlerCallback } from '$lib/server/bot-utils';
 
 export const bot = new Bot(ORGA_BOT_TOKEN);
@@ -11,5 +12,6 @@ export const usersBot = new UsersBot(bot);
 export const agendaBot = new AgendaBot(bot);
 export const weekPlanBot = new WeekPlanBot(bot);
 export const spamProtectionBot = new SpamProtectionBot(bot);
+export const lunchPollBot = new LunchPollBot(bot);
 
 bot.catch(errorHandlerCallback(bot, BOT_ADMIN_CHAT_ID));
