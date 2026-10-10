@@ -16,15 +16,19 @@ export class LunchPollBot {
 		if (lunchEvent) {
 			await this.bot.api.sendPoll(
 				BOT_HOME_GROUP_CHAT_ID,
-				'Who will join community lunch tomorrow?',
+				`Who will join community lunch on ${tomorrow.setLocale('en').toLocaleString({ weekday: 'long' })}?`,
 				[
 					{ text: '😋️ Yes, I will join' },
-					{ text: '🍱️ Pre-pare a lunch box / plate for me' },
+					{ text: '🍱️ Pre-pare a lunch box / plate for me, I eat later' },
 					{ text: '💤️ No, not this time' }
 				],
 				{
 					message_thread_id: topics.dailyInfo,
-					close_date: DateTime.fromISO(lunchEvent.start!.dateTime!).setZone(timeZone).toSeconds()
+					close_date: DateTime.fromISO(lunchEvent.start!.dateTime!)
+						.setZone(timeZone)
+						.minus({ hours: 2 })
+						.toSeconds(),
+					is_anonymous: false
 				}
 			);
 		} else {
