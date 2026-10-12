@@ -23,7 +23,7 @@ export class LunchPollBot {
 					{ text: '💤️ No, not this time' }
 				],
 				{
-					message_thread_id: topics.dailyInfo,
+					message_thread_id: topics.kitchen,
 					close_date: DateTime.fromISO(lunchEvent.start!.dateTime!)
 						.setZone(timeZone)
 						.minus({ hours: 2 })
