@@ -1,5 +1,11 @@
 import { type Bot } from 'grammy';
-import type { InputRichBlock, InputRichMessage, RichText, RichBlockTableCell, RichMessageButton } from 'grammy/types';
+import type {
+	InputRichBlock,
+	InputRichMessage,
+	RichText,
+	RichBlockTableCell,
+	RichMessageButton
+} from 'grammy/types';
 import { type CalendarEvent } from '$lib/server/calendar';
 import { DateTime } from 'luxon';
 import weekPlanApi, {

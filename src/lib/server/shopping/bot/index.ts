@@ -71,14 +71,9 @@ export async function updateLastMessage(complete?: boolean, newList?: boolean) {
 		if (complete) {
 			if (newList) {
 				const list = await listService.getCompletedList();
-				await bot.api.editMessageText(
-					BOT_HOME_GROUP_CHAT_ID,
-					lastMessageId,
-					shoppingList(list),
-					{
-						parse_mode: 'HTML'
-					}
-				);
+				await bot.api.editMessageText(BOT_HOME_GROUP_CHAT_ID, lastMessageId, shoppingList(list), {
+					parse_mode: 'HTML'
+				});
 			} else {
 				await bot.api.editMessageReplyMarkup(BOT_HOME_GROUP_CHAT_ID, lastMessageId);
 			}

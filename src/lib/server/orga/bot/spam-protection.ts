@@ -9,7 +9,11 @@ const moreThanThreeWords = (text: string) => text.trim().split(/\s+/, 4).length 
 export class SpamProtectionBot {
 	constructor(bot: Bot) {
 		bot.on('message', async (ctx) => {
-			if (ctx.chatId === parseInt(BOT_HOME_GROUP_CHAT_ID) && ctx.message.text && moreThanThreeWords(ctx.message.text)) {
+			if (
+				ctx.chatId === parseInt(BOT_HOME_GROUP_CHAT_ID) &&
+				ctx.message.text &&
+				moreThanThreeWords(ctx.message.text)
+			) {
 				const user = ctx.message.from;
 				const hash = createHash('sha256').update(ctx.message.text, 'utf8').digest('hex');
 
@@ -29,7 +33,7 @@ export class SpamProtectionBot {
 							message_thread_id: ctx.message.message_thread_id,
 							ephemeral_message_parameters: {
 								receiver_user_id: user.id
-							},
+							}
 						}
 					);
 

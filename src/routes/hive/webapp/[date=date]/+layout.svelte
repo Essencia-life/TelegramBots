@@ -116,6 +116,17 @@
 	onMount(() => {
 		preloadCode(resolve('/hive/webapp/[date=date]/booking', params));
 
+		WebApp.ready();
+
+		if (WebApp.initData) {
+			void cookieStore.set({
+				name: 'tg-session',
+				value: WebApp.initData,
+				expires: WebApp.initDataUnsafe.auth_date * 1000 + ms('23h'),
+				sameSite: 'strict'
+			});
+		}
+
 		WebApp.BackButton?.onClick(() => {
 			history.back();
 		});

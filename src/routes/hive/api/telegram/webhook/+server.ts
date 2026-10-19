@@ -10,7 +10,7 @@ export const POST = webhookCallback(bot, 'sveltekit', {
 export const GET = checkWebhookCallback(bot);
 
 export const PUT = setupWebhookCallback(bot, HIVE_BOT_SECRET_TOKEN, [
-	// 'message',
+	'message',
 	// 'edited_message',
 	// "channel_post",
 	// "edited_channel_post",

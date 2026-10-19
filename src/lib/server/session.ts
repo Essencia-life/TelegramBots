@@ -1,7 +1,7 @@
-import { type Cookies, error } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import type { WebAppInitData, WebAppUser } from 'telegram-web-app';
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { SHOPPING_BOT_TOKEN } from '$env/static/private';
+import { getRequestEvent } from '$app/server';
 
 interface InitData extends Omit<WebAppInitData, 'user'> {
 	user?: string;
@@ -11,8 +11,9 @@ interface Session extends Omit<WebAppInitData, 'hash' | 'user'> {
 	user: WebAppUser;
 }
 
-export function getSession(cookies: Cookies): Session {
-	const initData = cookies.get('shopping-session');
+export function getSession(botToken: string): Session {
+	const { cookies } = getRequestEvent();
+	const initData = cookies.get('tg-session');
 
 	if (!initData) {
 		return error(401, 'Unauthorized');
@@ -34,7 +35,7 @@ export function getSession(cookies: Cookies): Session {
 		.map(([k, v]) => `${k}=${v}`)
 		.join('\n');
 
-	const secretKey = createHmac('sha256', 'WebAppData').update(SHOPPING_BOT_TOKEN).digest();
+	const secretKey = createHmac('sha256', 'WebAppData').update(botToken).digest();
 
 	const expectedHash = createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
 

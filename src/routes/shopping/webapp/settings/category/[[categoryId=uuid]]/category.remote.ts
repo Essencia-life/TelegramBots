@@ -1,13 +1,14 @@
 import { z } from 'zod';
-import { command, form, getRequestEvent } from '$app/server';
+import { command, form } from '$app/server';
 import listService from '$lib/server/shopping/list.service';
 import { storageKey } from '$lib/server/shopping/utils/config';
 import { redis } from '$lib/server/redis';
 import type { UUID } from 'crypto';
 import { emojiRegex } from '$lib/client/shopping/utils';
-import { getSession } from '$lib/server/shopping/session';
+import { getSession } from '$lib/server/session';
 import { getList } from '../../../list.remote';
 import { updateLastMessage } from '$lib/server/shopping/bot';
+import { SHOPPING_BOT_TOKEN } from '$env/static/private';
 
 const zUuid = z.uuid().transform((str) => str as UUID);
 
@@ -20,8 +21,7 @@ const zSetCategory = z.object({
 export type SetCategoryInput = z.input<typeof zSetCategory>;
 
 export const setCategory = form(zSetCategory, async (category) => {
-	const { cookies } = getRequestEvent();
-	getSession(cookies);
+	getSession(SHOPPING_BOT_TOKEN);
 
 	if (category.id) {
 		await listService.updateCategory({
@@ -46,8 +46,7 @@ export const setCategory = form(zSetCategory, async (category) => {
 });
 
 export const deleteCategory = command(zUuid, async (categoryId) => {
-	const { cookies } = getRequestEvent();
-	getSession(cookies);
+	getSession(SHOPPING_BOT_TOKEN);
 
 	await listService.deleteCategory(categoryId);
 
@@ -57,8 +56,7 @@ export const deleteCategory = command(zUuid, async (categoryId) => {
 export const moveCategory = command(
 	z.object({ categoryId: zUuid, insertIndex: z.int() }),
 	async ({ categoryId, insertIndex }) => {
-		const { cookies } = getRequestEvent();
-		getSession(cookies);
+		getSession(SHOPPING_BOT_TOKEN);
 
 		await listService.moveCategory(categoryId, insertIndex);
 

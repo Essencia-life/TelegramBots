@@ -31,10 +31,10 @@
 
 		if (WebApp.initData) {
 			await cookieStore.set({
-				name: 'shopping-session',
+				name: 'tg-session',
 				value: WebApp.initData,
 				expires: WebApp.initDataUnsafe.auth_date * 1000 + ms('23h'),
-				sameSite: 'strict',
+				sameSite: 'strict'
 			});
 		}
 
