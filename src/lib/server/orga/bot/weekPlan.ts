@@ -3,7 +3,6 @@ import type {
 	InputRichBlock,
 	InputRichMessage,
 	RichText,
-	RichBlockTableCell,
 	RichMessageButton
 } from 'grammy/types';
 import { type CalendarEvent } from '$lib/server/calendar';
@@ -149,7 +148,6 @@ export class WeekPlanBot {
 
 	private buildEventBlocks(events: CalendarEvent[]): InputRichBlock[] {
 		const blocks: InputRichBlock[] = [];
-		const rows: RichBlockTableCell[][] = [];
 
 		for (const event of events) {
 			const props = event.extendedProperties?.private as unknown as EventProps | undefined;
@@ -161,7 +159,13 @@ export class WeekPlanBot {
 			}
 
 			const assignedJobs: EventPropsJobs = JSON.parse(props.jobs);
-			for (const [jobIndex, job] of config.jobs.entries()) {
+			blocks.push({
+				type: 'heading',
+				size: 5,
+				text: event.summary ?? ''
+			});
+
+			for (const job of config.jobs) {
 				const assignedJob = assignedJobs[job.name] ?? { title: job.title, persons: [] };
 				const people = assignedJob.persons.flatMap((person, index): RichText[] => {
 					const name: RichText = person.id
@@ -173,7 +177,11 @@ export class WeekPlanBot {
 						: person.first_name;
 					return index === 0 ? [name] : [' & ', name];
 				});
-				const assignmentCell: RichText[] = people.length > 0 ? [...people] : [];
+				const text: RichText[] = [job.title, ': '];
+
+				if (people.length > 0) {
+					text.push(...people);
+				}
 
 				if (assignedJob.persons.length < job.persons) {
 					const button: RichMessageButton =
@@ -187,11 +195,11 @@ export class WeekPlanBot {
 									callback_data: `plan:${event.id}:${job.name}`
 								};
 
-					if (assignmentCell.length > 0) {
-						assignmentCell.push(' & ');
+					if (text.length > 2) {
+						text.push(' & ');
 					}
 
-					assignmentCell.push({
+					text.push({
 						type: 'button',
 						button: {
 							...button,
@@ -200,26 +208,17 @@ export class WeekPlanBot {
 					});
 				}
 
-				if (jobIndex === 0) {
-					const title: RichText = {
-						type: 'bold',
-						text: event.summary ?? ''
-					};
-					rows.push([tableCell(title, true, 2)]);
-				}
-
-				rows.push([tableCell(job.title), tableCell(assignmentCell)]);
+				blocks.push({
+					type: 'paragraph',
+					text
+				});
 			}
 		}
 
-		if (rows.length > 0) {
-			blocks.push({
-				type: 'table',
-				cells: rows,
-				is_bordered: true,
-				is_compact: true
-			});
-		}
+		blocks.push({
+			type: 'paragraph',
+			text: ''
+		});
 
 		return blocks;
 	}
@@ -236,7 +235,7 @@ export class WeekPlanBot {
 		const blocks: InputRichBlock[] = [
 			{ type: 'heading', size: 1, text: `Your week, ${user.first_name}` }
 		];
-		const rows: RichBlockTableCell[][] = [];
+		let hasAssignments = false;
 
 		for (const event of events) {
 			const props = event.extendedProperties?.private as unknown as EventProps | undefined;
@@ -244,38 +243,41 @@ export class WeekPlanBot {
 			if (!props || !config || !event.id) continue;
 
 			const assignedJobs: EventPropsJobs = JSON.parse(props.jobs);
+			const eventLabel =
+				event.start?.date && !event.start.dateTime
+					? 'All week'
+					: getEventDate(event).toLocaleString({ weekday: 'long', day: 'numeric', month: 'numeric' });
+			let eventHeadingAdded = false;
+
 			for (const job of config.jobs) {
 				const assignedJob = assignedJobs[job.name];
 				if (!assignedJob?.persons.some((person) => person.id === user.id)) continue;
+				hasAssignments = true;
 
-				const eventDate = getEventDate(event);
-				const label =
-					event.start?.date && !event.start.dateTime
-						? 'All week'
-						: eventDate.toLocaleString({ weekday: 'long', day: 'numeric', month: 'numeric' });
+				if (!eventHeadingAdded) {
+					blocks.push({ type: 'heading', size: 5, text: eventLabel });
+					eventHeadingAdded = true;
+				}
 
-				rows.push([tableCell({ type: 'bold', text: label }, true, 2)]);
-				rows.push([
-					tableCell(job.title),
-					tableCell({
-						type: 'button',
-						button: {
-							style: 'danger',
-							text: 'Handover',
-							callback_data: `unassign:${event.id}:${job.name}`
+				blocks.push({
+					type: 'paragraph',
+					text: [
+						{ type: 'bold', text: job.title },
+						': ',
+						{
+							type: 'button',
+							button: {
+								style: 'danger',
+								text: 'Handover',
+								callback_data: `unassign:${event.id}:${job.name}`
+							}
 						}
-					})
-				]);
+					]
+				});
 			}
 		}
 
-		if (rows.length > 0) {
-			blocks.push({
-				type: 'table',
-				cells: rows,
-				is_bordered: true
-			});
-		} else {
+		if (!hasAssignments) {
 			blocks.push({
 				type: 'paragraph' as const,
 				text: { type: 'italic' as const, text: 'You have no sign-ups for this week.' }
@@ -476,16 +478,6 @@ function getEventDate(event: CalendarEvent) {
 	const date = event.start?.dateTime ?? event.start?.date;
 	if (!date) throw new Error(`Weekly-plan event "${event.summary}" has no start date.`);
 	return DateTime.fromISO(date, { zone: event.start?.timeZone ?? timeZone }).setZone(timeZone);
-}
-
-function tableCell(text?: RichText, isHeader = false, colspan?: number) {
-	return {
-		...(text !== undefined && { text }),
-		...(isHeader && { is_header: true as const }),
-		...(colspan && colspan > 1 && { colspan }),
-		align: 'left' as const,
-		valign: 'top' as const
-	};
 }
 
 export function formatTelegramUsers(users: TelegramUser[]) {
