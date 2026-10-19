@@ -1,14 +1,14 @@
-import { command, getRequestEvent, query } from '$app/server';
+import { command, query } from '$app/server';
 import { updateLastMessage, sendNewList as sendNewListMessage } from '$lib/server/shopping/bot';
 import inlineMessageIdService from '$lib/server/shopping/inlineMessageId.service';
 import listService from '$lib/server/shopping/list.service';
 import type { UUID } from 'crypto';
 import z from 'zod';
-import { getSession } from '$lib/server/shopping/session';
+import { getSession } from '$lib/server/session';
+import { SHOPPING_BOT_TOKEN } from '$env/static/private';
 
 export const getList = query(() => {
-	const { cookies } = getRequestEvent();
-	getSession(cookies);
+	getSession(SHOPPING_BOT_TOKEN);
 
 	return listService.getList();
 });
@@ -16,8 +16,7 @@ export const getList = query(() => {
 const zUuid = z.uuid().transform((str) => str as UUID);
 
 export const checkListItem = command(zUuid, async (itemId) => {
-	const { cookies } = getRequestEvent();
-	const { user } = getSession(cookies);
+	const { user } = getSession(SHOPPING_BOT_TOKEN);
 
 	await listService.checkItem({
 		itemId,
@@ -43,8 +42,7 @@ const zMoveListItemInput = z.object({
 });
 
 export const moveListItem = command(zMoveListItemInput, async ({ id, categoryId, ...insert }) => {
-	const { cookies } = getRequestEvent();
-	getSession(cookies);
+	getSession(SHOPPING_BOT_TOKEN);
 
 	await listService.moveItemInsideCategory(categoryId, id, insert);
 
@@ -53,30 +51,26 @@ export const moveListItem = command(zMoveListItemInput, async ({ id, categoryId,
 });
 
 export const completeList = command(z.boolean(), async (newList: boolean) => {
-	const { cookies } = getRequestEvent();
-	getSession(cookies);
+	getSession(SHOPPING_BOT_TOKEN);
 
 	await updateLastMessage(true, newList);
 	await inlineMessageIdService.deleteId();
 });
 
 export const clearLists = command(async () => {
-	const { cookies } = getRequestEvent();
-	getSession(cookies);
+	getSession(SHOPPING_BOT_TOKEN);
 
 	await listService.clearLists();
 });
 
 export const deleteCheckedListItems = command(async () => {
-	const { cookies } = getRequestEvent();
-	getSession(cookies);
+	getSession(SHOPPING_BOT_TOKEN);
 
 	await listService.deleteCheckedItems();
 });
 
 export const sendNewList = command(async () => {
-	const { cookies } = getRequestEvent();
-	getSession(cookies);
+	getSession(SHOPPING_BOT_TOKEN);
 
 	await sendNewListMessage();
 });

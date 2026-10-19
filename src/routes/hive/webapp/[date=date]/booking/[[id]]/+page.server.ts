@@ -8,6 +8,8 @@ export const load: PageServerLoad = async ({ params }) => {
 		const coWorkingCalendar = new Calendar(CO_WORKING_CALENDAR_ID);
 		const booking = await coWorkingCalendar.getEvent(params.id);
 
+		// TODO check if user has permission to view this booking
+
 		return { booking };
 	}
 };

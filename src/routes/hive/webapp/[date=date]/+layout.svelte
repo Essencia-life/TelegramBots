@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy, type Snippet } from 'svelte';
 	import { on } from 'svelte/events';
-	import WebApp from '@twa-dev/sdk';
+	import WebApp from '$lib/client/webapp';
 	import type { PageProps } from './$types';
 	import { afterNavigate, goto, preloadCode } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -19,7 +19,7 @@
 		children?: Snippet;
 	}
 
-	let { children, data, params }: Props = $props();
+	let { children, params }: Props = $props();
 	let refreshIntervalInstance: number;
 	let dateInput: HTMLInputElement;
 
@@ -113,12 +113,26 @@
 		refreshIntervalInstance = window.setInterval(() => getBookings(params.date).refresh(), 30_000);
 	}
 
-	onMount(() => {
-		preloadCode(resolve('/hive/webapp/[date=date]/booking', params));
+	let ready = $state(false);
+
+	onMount(async () => {
+		void preloadCode(resolve('/hive/webapp/[date=date]/booking', params));
+
+		if (WebApp.initData) {
+			await cookieStore.set({
+				name: 'tg-session',
+				value: WebApp.initData,
+				expires: WebApp.initDataUnsafe.auth_date * 1000 + ms('23h'),
+				sameSite: 'none',
+				partitioned: true
+			});
+		}
 
 		WebApp.BackButton?.onClick(() => {
 			history.back();
 		});
+
+		ready = true;
 
 		refreshInterval();
 	});
@@ -197,16 +211,16 @@
 	{@attach swipe({ threshold: 100, left: nextDay, right: prevDay })}
 >
 	<div class="column col-1! row-start-4! -row-end-1! text-sm text-gray-700">
-		{#each hours as hour}
+		{#each hours as hour (hour)}
 			<div class="row-span-4">
 				<time>{timeFormatter.format(new Date(startOfDay).setHours(hour))}</time>
 			</div>
 		{/each}
 	</div>
 	<div class="column">
-		{#each Array(24) as _, hour}
+		{#each Array(24) as _, hour (hour)}
 			<div class="row-span-4 grid grid-rows-4 rounded-lg bg-white">
-				{#each Array(4) as _, quarter}
+				{#each Array(4) as _, quarter (quarter)}
 					{@const time = timeFormatter.format(new Date(startOfDay).setHours(hour, quarter * 15))}
 					<a
 						class="relative z-1"
@@ -222,38 +236,40 @@
 			</div>
 		{/each}
 	</div>
-	<div class="column">
-		{#each await getBookings(params.date) as booking (booking.id)}
-			{@const isOwn =
-				booking.extendedProperties?.shared?.telegramUserId === data.user.id.toString()}
+	{#if ready}
+		<div class="column">
+			{#each await getBookings(params.date) as booking (booking.id)}
+				{@const isOwn =
+					booking.extendedProperties?.shared?.telegramUserId === WebApp.initDataUnsafe.user?.id.toString()}
 
-			<svelte:element
-				this={isOwn ? 'a' : 'div'}
-				class="booking z-2 flex flex-col rounded-lg bg-accent p-2! text-white"
-				class:small={isShortBooking(booking.start!.dateTime!, booking.end!.dateTime!)}
-				class:past={isPast(booking.end!.dateTime!)}
-				style:grid-row={timeToRows(booking.start!.dateTime!, booking.end!.dateTime!)}
-				data-sveltekit-noscroll
-				href={isOwn
-					? resolve('/hive/webapp/[date=date]/booking/[[id]]', {
-							date: params.date,
-							id: booking.id!
-						})
-					: undefined}
-			>
-				<b>{booking.summary}</b>
-				<div class="overflow-hidden leading-6">{booking.description}</div>
-			</svelte:element>
-		{/each}
+				<svelte:element
+					this={isOwn ? 'a' : 'div'}
+					class="booking z-2 flex flex-col rounded-lg bg-accent p-2! text-white"
+					class:small={isShortBooking(booking.start!.dateTime!, booking.end!.dateTime!)}
+					class:past={isPast(booking.end!.dateTime!)}
+					style:grid-row={timeToRows(booking.start!.dateTime!, booking.end!.dateTime!)}
+					data-sveltekit-noscroll
+					href={isOwn
+						? resolve('/hive/webapp/[date=date]/booking/[[id]]', {
+								date: params.date,
+								id: booking.id!
+							})
+						: undefined}
+				>
+					<b>{booking.summary}</b>
+					<div class="overflow-hidden leading-6">{booking.description}</div>
+				</svelte:element>
+			{/each}
 
-		{#if startOfDay.getTime() < now.getTime() && now.getTime() < endOfDay.getTime()}
-			<div
-				class="now pointer-events-none absolute inset-x-0 border-t-2 border-amber"
-				style:--now={percent(now)}
-				{@attach scrollIntoView}
-			></div>
-		{/if}
-	</div>
+			{#if startOfDay.getTime() < now.getTime() && now.getTime() < endOfDay.getTime()}
+				<div
+					class="now pointer-events-none absolute inset-x-0 border-t-2 border-amber"
+					style:--now={percent(now)}
+					{@attach scrollIntoView}
+				></div>
+			{/if}
+		</div>
+	{/if}
 </main>
 
 <Button

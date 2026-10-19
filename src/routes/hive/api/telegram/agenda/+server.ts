@@ -1,5 +1,5 @@
 import type { RequestHandler } from './$types';
-import { bot } from '$lib/server/hive/bot';
+import { bot, getInlineKeyboardOpenBookingsButton } from '$lib/server/hive/bot';
 import { InlineKeyboard } from 'grammy';
 import { BOT_HOME_GROUP_CHAT_ID, HIVE_BOT_TOPIC_ID, VERCEL_ENV } from '$env/static/private';
 import { redis } from '$lib/server/redis';
@@ -25,7 +25,7 @@ export const GET: RequestHandler = async () => {
 	const message = await bot.api.sendMessage(BOT_HOME_GROUP_CHAT_ID, text, {
 		parse_mode: 'HTML',
 		message_thread_id: Number(HIVE_BOT_TOPIC_ID),
-		reply_markup: new InlineKeyboard().switchInlineCurrent('Manage bookings')
+		reply_markup: new InlineKeyboard().add(await getInlineKeyboardOpenBookingsButton())
 	});
 
 	await redis.set(`essencia:${VERCEL_ENV}:hiveBotAgendaMessageId`, message.message_id, {

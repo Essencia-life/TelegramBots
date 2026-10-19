@@ -1,11 +1,12 @@
 import { z } from 'zod';
-import { command, form, getRequestEvent } from '$app/server';
+import { command, form } from '$app/server';
 import type { UUID } from 'crypto';
-import listService from '$lib/server/shopping/list.service'; // TODO move into route?
+import listService from '$lib/server/shopping/list.service'; // TODO move into route as list.server.ts?
 import { updateLastMessage } from '$lib/server/shopping/bot';
 import { getList } from '../../../list.remote';
 import { error } from '@sveltejs/kit';
-import { getSession } from '$lib/server/shopping/session';
+import { getSession } from '$lib/server/session';
+import { SHOPPING_BOT_TOKEN } from '$env/static/private';
 
 const zUuid = z.uuid().transform((str) => str as UUID);
 
@@ -24,8 +25,7 @@ export type SetItemInput = z.input<typeof zSetItem>;
 export const setItem = form(
 	zSetItem,
 	async ({ id, categoryId, previousCategoryId, ...updates }) => {
-		const { cookies } = getRequestEvent();
-		const { user } = getSession(cookies);
+		const { user } = getSession(SHOPPING_BOT_TOKEN);
 
 		if (id) {
 			const item = await listService.getItem(id);
@@ -83,8 +83,7 @@ export const setItem = form(
 );
 
 export const deleteItem = command(zUuid, async (id) => {
-	const { cookies } = getRequestEvent();
-	getSession(cookies);
+	getSession(SHOPPING_BOT_TOKEN);
 
 	await listService.deleteItem(id);
 

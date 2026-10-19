@@ -1,22 +1,16 @@
 import { error } from '@sveltejs/kit';
 import { z } from 'zod';
-import { query, command, getRequestEvent } from '$app/server';
-import { decryptParam } from '$lib/server/encryption';
+import { query, command } from '$app/server';
+import { getSession } from '$lib/server/session';
 import { Calendar } from '$lib/server/calendar';
 import { updateAgenda, updateInlineMessage } from '$lib/server/hive/bot';
-import { CO_WORKING_CALENDAR_ID, HIVE_CALENDAR_ID } from '$env/static/private';
+import { CO_WORKING_CALENDAR_ID, HIVE_CALENDAR_ID, HIVE_BOT_TOKEN } from '$env/static/private';
 
 export const getBookings = query(z.iso.date(), async (date) => {
 	const startDate = new Date(`${date} 00:00:00:000`);
 	const endDate = new Date(`${date} 23:59:59:999`);
 
-	const { cookies } = getRequestEvent();
-	const userEncrypted = cookies.get('hive-session');
-	const user = userEncrypted && decryptParam(userEncrypted);
-
-	if (!user) {
-		return error(401, 'Unauthorized');
-	}
+	getSession(HIVE_BOT_TOKEN);
 
 	const hiveCalendar = new Calendar(HIVE_CALENDAR_ID);
 	return hiveCalendar.getEvents([], startDate, endDate);
@@ -40,13 +34,7 @@ export const createBooking = command(
 		description: z.string()
 	}),
 	async ({ startDate, endDate, description }) => {
-		const { cookies } = getRequestEvent();
-		const userEncrypted = cookies.get('hive-session');
-		const user = userEncrypted && decryptParam(userEncrypted);
-
-		if (!user) {
-			return error(401, 'Unauthorized');
-		}
+		const user = getSession(HIVE_BOT_TOKEN).user;
 
 		const coWorkingCalendar = new Calendar(CO_WORKING_CALENDAR_ID);
 
@@ -83,13 +71,9 @@ export const createBooking = command(
 );
 
 export const deleteBooking = command(z.string(), async (id: string) => {
-	const { cookies } = getRequestEvent();
-	const userEncrypted = cookies.get('hive-session');
-	const user = userEncrypted && decryptParam(userEncrypted);
+	getSession(HIVE_BOT_TOKEN);
 
-	if (!user) {
-		return error(401, 'Unauthorized');
-	}
+	// TODO verify user has permission to delete the booking
 
 	const coWorkingCalendar = new Calendar(CO_WORKING_CALENDAR_ID);
 	const booking = await coWorkingCalendar.getEvent(id);
@@ -119,13 +103,9 @@ export const updateBooking = command(
 		description: z.string()
 	}),
 	async ({ id, startDate, endDate, description }) => {
-		const { cookies } = getRequestEvent();
-		const userEncrypted = cookies.get('hive-session');
-		const user = userEncrypted && decryptParam(userEncrypted);
+		getSession(HIVE_BOT_TOKEN);
 
-		if (!user) {
-			return error(401, 'Unauthorized');
-		}
+		// TODO verify user has permission to update the booking
 
 		const coWorkingCalendar = new Calendar(CO_WORKING_CALENDAR_ID);
 

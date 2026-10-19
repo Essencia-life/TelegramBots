@@ -1,5 +1,5 @@
 <script lang="ts">
-	import WebApp from '@twa-dev/sdk';
+	import WebApp from '$lib/client/webapp';
 	import {
 		checkAvailability,
 		createBooking,

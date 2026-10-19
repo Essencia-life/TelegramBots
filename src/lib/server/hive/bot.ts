@@ -3,17 +3,24 @@ import {
 	BOT_HOME_GROUP_CHAT_ID,
 	HIVE_BOT_TOKEN,
 	CO_WORKING_CALENDAR_ID,
-	VERCEL_ENV,
-	VERCEL_URL
+	VERCEL_ENV
 } from '$env/static/private';
 import { Bot, InlineKeyboard, InlineQueryResultBuilder } from 'grammy';
-import { encryptParam } from '../encryption';
 import { Calendar, type CalendarEvent } from '../calendar';
 import { generateAgenda } from './agenda';
 import { redis } from '$lib/server/redis';
 import { errorHandlerCallback } from '$lib/server/bot-utils';
 
 export const bot = new Bot(HIVE_BOT_TOKEN);
+
+export async function getInlineKeyboardOpenBookingsButton() {
+	const botInfo = await bot.api.getMe();
+
+	return InlineKeyboard.url(
+		'Manage bookings',
+		`https://t.me/${botInfo.username}?startapp=${BOT_HOME_GROUP_CHAT_ID}`
+	);
+}
 
 bot.on('my_chat_member', async (ctx) => {
 	const { status } = ctx.myChatMember.new_chat_member;
@@ -33,7 +40,7 @@ bot.on('inline_query', async (ctx) => {
 
 		if (booking) {
 			booking.id = id;
-			return ctx.answerInlineQuery(createInlineQueryArticlesFromBookings([booking]), {
+			return ctx.answerInlineQuery(await createInlineQueryArticlesFromBookings([booking]), {
 				cache_time: 0,
 				is_personal: true
 			});
@@ -45,16 +52,23 @@ bot.on('inline_query', async (ctx) => {
 		new Date()
 	);
 
-	return ctx.answerInlineQuery(createInlineQueryArticlesFromBookings(myBookigns), {
+	return ctx.answerInlineQuery(await createInlineQueryArticlesFromBookings(myBookigns), {
 		cache_time: 0,
 		is_personal: true,
 		button: {
 			text: '🗓️ Add and manage my bookings',
-			web_app: {
-				url: `https://${VERCEL_URL}/hive/webapp?user=${encryptParam(ctx.from)}`
-			}
+			start_parameter: BOT_HOME_GROUP_CHAT_ID
 		}
 	});
+});
+
+bot.command('start', async (ctx) => {
+	if (ctx.match === BOT_HOME_GROUP_CHAT_ID) {
+		await ctx.api.sendMessage(ctx.chatId, 'Use the button below to open the booking calendar.', {
+			reply_markup: new InlineKeyboard().add(await getInlineKeyboardOpenBookingsButton())
+		});
+		await ctx.api.deleteMessage(ctx.chatId, ctx.message!.message_id);
+	}
 });
 
 function generateBookingMessage(booking: CalendarEvent, deleted = false) {
@@ -100,7 +114,7 @@ export async function updateInlineMessage(
 	try {
 		await bot.api.editMessageTextInline(inlineMessageId, text, {
 			parse_mode: 'HTML',
-			reply_markup: new InlineKeyboard().switchInlineCurrent('Manage bookings')
+			reply_markup: new InlineKeyboard().add(await getInlineKeyboardOpenBookingsButton())
 		});
 	} catch (err) {
 		console.error('Failed to update inline message:', err);
@@ -131,7 +145,7 @@ export async function updateAgenda(event: CalendarEvent) {
 			// FIXME message not updated - probably the resource calendar is delayed
 			return bot.api.editMessageText(BOT_HOME_GROUP_CHAT_ID, messageId, text, {
 				parse_mode: 'HTML',
-				reply_markup: new InlineKeyboard().switchInlineCurrent('Manage bookings')
+				reply_markup: new InlineKeyboard().add(await getInlineKeyboardOpenBookingsButton())
 			});
 		}
 
@@ -139,7 +153,9 @@ export async function updateAgenda(event: CalendarEvent) {
 	}
 }
 
-function createInlineQueryArticlesFromBookings(bookings: CalendarEvent[]) {
+async function createInlineQueryArticlesFromBookings(bookings: CalendarEvent[]) {
+	const openBookingsInlineButton = await getInlineKeyboardOpenBookingsButton();
+
 	return bookings.map((booking) => {
 		const startDate = new Date(booking.start!.dateTime!);
 		const endDate = new Date(booking.end!.dateTime!);
@@ -167,7 +183,7 @@ function createInlineQueryArticlesFromBookings(bookings: CalendarEvent[]) {
 			thumbnail_url: 'https://emojiapi.dev/api/v1/laptop/96.png',
 			thumbnail_height: 96,
 			thumbnail_width: 96,
-			reply_markup: new InlineKeyboard().switchInlineCurrent('Manage bookings')
+			reply_markup: new InlineKeyboard().add(openBookingsInlineButton)
 		}).text(message, {
 			parse_mode: 'HTML'
 		});
