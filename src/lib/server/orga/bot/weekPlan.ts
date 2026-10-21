@@ -294,7 +294,7 @@ export class WeekPlanBot {
 			buttons: [
 				{
 					text: 'Back to the week',
-					callback_data: `back_to_week:${messageId}`
+					callback_data: 'back_to_week'
 				}
 			]
 		});
@@ -341,11 +341,8 @@ export class WeekPlanBot {
 			return ctx.answerCallbackQuery();
 		});
 
-		this.bot.callbackQuery(/^back_to_week:(?<messageId>\d+)$/, async (ctx) => {
-			if (typeof ctx.match !== 'object' || !('groups' in ctx.match)) return;
-
-			const { messageId } = ctx.match.groups!;
-			await this.updateWeekPlan(Number(messageId));
+		this.bot.callbackQuery('back_to_week', async (ctx) => {
+			await ctx.deleteEphemeralMessage();
 			return ctx.answerCallbackQuery();
 		});
 
