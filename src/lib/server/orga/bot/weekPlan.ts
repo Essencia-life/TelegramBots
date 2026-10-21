@@ -1,4 +1,4 @@
-import { type Bot } from 'grammy';
+import { type Bot, InlineKeyboard, InlineQueryResultBuilder } from 'grammy';
 import type {
 	InputRichBlock,
 	InputRichMessage,
@@ -13,7 +13,7 @@ import weekPlanApi, {
 	type WeeklyJobsConfigs
 } from '../week-plan-api';
 import weeklyJobs from '$lib/client/orga/config/weekly-jobs.json';
-import type { TelegramUser } from '../users';
+import users, { type TelegramUser } from '../users';
 import { BOT_HOME_GROUP_CHAT_ID } from '$env/static/private';
 import topics from '../utils/topics';
 
@@ -23,6 +23,7 @@ const configs = weeklyJobs.config as WeeklyJobsConfigs;
 export class WeekPlanBot {
 	constructor(private readonly bot: Bot) {
 		this.setupCallbackHandler();
+		this.setupInlineQuery();
 		this.setupStartHandler();
 	}
 
@@ -68,7 +69,7 @@ export class WeekPlanBot {
 		);
 	}
 
-	private buildWeekMessage(weekStart: DateTime, events: CalendarEvent[]): InputRichMessage {
+	private buildWeekMessage(weekStart: DateTime, events: CalendarEvent[], isAdmin = false): InputRichMessage {
 		const blocks: InputRichBlock[] = [
 			{
 				type: 'heading',
@@ -80,7 +81,8 @@ export class WeekPlanBot {
 			},
 			{
 				type: 'paragraph',
-				text: '✍️ Please sign up for the upcoming week by tapping “I will do it” before Monday morning meeting.'
+				text: isAdmin ? 'You are in admin planing mode - from here you can assign people manually.'
+					: '✍️ Please sign up for the upcoming week by tapping “I will do it” before Monday morning meeting.'
 			}
 		];
 		const allWeekEvents: CalendarEvent[] = [];
@@ -102,7 +104,7 @@ export class WeekPlanBot {
 
 		if (allWeekEvents.length > 0) {
 			blocks.push({ type: 'heading', size: 2, text: 'All week' });
-			blocks.push(...this.buildEventBlocks(allWeekEvents));
+			blocks.push(...this.buildEventBlocks(allWeekEvents, isAdmin));
 		}
 
 		for (let weekday = 0; weekday < 5; weekday++) {
@@ -114,7 +116,7 @@ export class WeekPlanBot {
 					.setLocale('en-DE')
 					.toLocaleString({ weekday: 'long', day: 'numeric', month: 'numeric' })
 			});
-			blocks.push(...this.buildEventBlocks(eventsByWeekday.get(weekday) ?? []));
+			blocks.push(...this.buildEventBlocks(eventsByWeekday.get(weekday) ?? [], isAdmin));
 		}
 
 		blocks.push({
@@ -122,16 +124,29 @@ export class WeekPlanBot {
 			text: ''
 		});
 
-		blocks.push({
-			type: 'buttons',
-			align: 'left',
-			buttons: [
-				{
-					text: 'My Week',
-					callback_data: 'my_week'
-				}
-			]
-		});
+		if (isAdmin) {
+			blocks.push({
+				type: 'buttons',
+				align: 'left',
+				buttons: [
+					{
+						text: 'Back to personal mode',
+						callback_data: 'back_to_week'
+					}
+				]
+			});
+		} else {
+			blocks.push({
+				type: 'buttons',
+				align: 'left',
+				buttons: [
+					{
+						text: 'My Week',
+						callback_data: 'my_week'
+					}
+				]
+			});
+		}
 
 		blocks.push({
 			type: 'footer',
@@ -146,7 +161,7 @@ export class WeekPlanBot {
 		return { blocks };
 	}
 
-	private buildEventBlocks(events: CalendarEvent[]): InputRichBlock[] {
+	private buildEventBlocks(events: CalendarEvent[], isAdmin = false): InputRichBlock[] {
 		const blocks: InputRichBlock[] = [];
 
 		for (const event of events) {
@@ -175,7 +190,20 @@ export class WeekPlanBot {
 								url: `tg://user?id=${person.id}`
 							}
 						: person.first_name;
-					return index === 0 ? [name] : [' & ', name];
+					const nameBlocks: RichText[] = index === 0 ? [name] : [' & ', name];
+
+					if (isAdmin) {
+						nameBlocks.push({
+							type: 'button',
+							button: {
+								style: 'danger',
+								text: 'x',
+								callback_data: `unassign:${event.id}:${job.name}:${person.id}`
+							}
+						});
+					}
+
+					return nameBlocks;
 				});
 				const text: RichText[] = [job.title, ': '];
 
@@ -185,7 +213,10 @@ export class WeekPlanBot {
 
 				if (assignedJob.persons.length < job.persons) {
 					const button: RichMessageButton =
-						'askDetails' in job && job.askDetails
+						isAdmin ? {
+							text: 'Assign person',
+							switch_inline_query_current_chat: `#${event.id}_${job.name} `
+						} : ('askDetails' in job && job.askDetails
 							? {
 									text: 'I will do it',
 									url: `https://t.me/EssenciaOrgaBot?start=plan_${event.id}_${job.name}`
@@ -193,7 +224,7 @@ export class WeekPlanBot {
 							: {
 									text: 'I will do it',
 									callback_data: `plan:${event.id}:${job.name}`
-								};
+								});
 
 					if (text.length > 2) {
 						text.push(' & ');
@@ -227,7 +258,7 @@ export class WeekPlanBot {
 		messageId: number,
 		user: TelegramUser,
 		callbackQueryId?: string,
-		replaceCallbackQueryMessage = false
+		isAdmin = false
 	) {
 		if (!user.id) return;
 
@@ -246,7 +277,11 @@ export class WeekPlanBot {
 			const eventLabel =
 				event.start?.date && !event.start.dateTime
 					? 'All week'
-					: getEventDate(event).toLocaleString({ weekday: 'long', day: 'numeric', month: 'numeric' });
+					: getEventDate(event).toLocaleString({
+							weekday: 'long',
+							day: 'numeric',
+							month: 'numeric'
+						});
 			let eventHeadingAdded = false;
 
 			for (const job of config.jobs) {
@@ -288,18 +323,28 @@ export class WeekPlanBot {
 			});
 		}
 
+		const bottomButtons: RichMessageButton[] = [
+			{
+				text: 'Back to the week',
+				callback_data: 'back_to_week'
+			}
+		];
+
+		if (isAdmin) {
+			bottomButtons.push({
+				text: 'Admin planing mode',
+				style: 'primary',
+				callback_data: 'admin_plan_mode'
+			});
+		}
+
 		blocks.push({
 			type: 'buttons',
 			align: 'left',
-			buttons: [
-				{
-					text: 'Back to the week',
-					callback_data: 'back_to_week'
-				}
-			]
+			buttons: bottomButtons
 		});
 
-		if (replaceCallbackQueryMessage && callbackQueryId) {
+		if (callbackQueryId) {
 			await this.bot.api.sendRichMessage(
 				BOT_HOME_GROUP_CHAT_ID,
 				{ blocks },
@@ -328,8 +373,29 @@ export class WeekPlanBot {
 		);
 	}
 
+	private async sendWeekPlanAdminMode(messageId: number, user: TelegramUser, callbackQueryId: string) {
+		if (!user.id) return;
+
+		const events = await weekPlanApi.getEventsByPlanMessageId(messageId);
+		if (events.length === 0) return;
+
+		const weekStart = getEventDate(events[0]).set({ weekday: 1 }).startOf('day');
+
+		await this.bot.api.sendRichMessage(
+			BOT_HOME_GROUP_CHAT_ID,
+			this.buildWeekMessage(weekStart, events, true),
+			{
+				message_thread_id: topics.weeklyJobs,
+				ephemeral_message_parameters: {
+					receiver_user_id: user.id,
+					...(callbackQueryId && { callback_query_id: callbackQueryId })
+				}
+			}
+		);
+	}
+
 	private setupCallbackHandler() {
-		this.bot.callbackQuery(/^my_week$/, async (ctx) => {
+		this.bot.callbackQuery('my_week', async (ctx) => {
 			const user = ctx.from;
 			const messageId = Number(ctx.callbackQuery.message?.message_id);
 
@@ -337,7 +403,29 @@ export class WeekPlanBot {
 				return ctx.answerCallbackQuery({ text: 'Could not open your week.' });
 			}
 
-			await this.sendUserWeekSummary(messageId, user, ctx.callbackQuery.id, true);
+			const admins = await ctx.getChatAdministrators();
+			const isAdmin = admins.some((admin) => admin.user.id === user.id);
+
+			await this.sendUserWeekSummary(messageId, user, ctx.callbackQuery.id, isAdmin);
+			return ctx.answerCallbackQuery();
+		});
+
+		this.bot.callbackQuery('admin_plan_mode', async (ctx) => {
+			const user = ctx.from;
+			const messageId = Number(ctx.callbackQuery.message?.message_id);
+
+			if (!user || !Number.isInteger(messageId)) {
+				return ctx.answerCallbackQuery({ text: 'Could not open admin mode.' });
+			}
+
+			const admins = await ctx.getChatAdministrators();
+			const isAdmin = admins.some((admin) => admin.user.id === user.id);
+
+			if (!isAdmin) {
+				return ctx.answerCallbackQuery({ text: 'Could not open admin mode.' });
+			}
+
+			await this.sendWeekPlanAdminMode(messageId, user, ctx.callbackQuery.id);
 			return ctx.answerCallbackQuery();
 		});
 
@@ -347,13 +435,13 @@ export class WeekPlanBot {
 		});
 
 		this.bot.callbackQuery(
-			/^(?<action>plan|unassign):(?<eventId>[\w-]+):(?<jobName>[\w-]+)$/,
+			/^(?<action>plan|unassign):(?<eventId>[\w-]+):(?<jobName>[\w-]+)(:(?<userId>\d+))?$/,
 			async (ctx) => {
 				if (typeof ctx.match !== 'object' || !('groups' in ctx.match)) return;
 
-				const { action, eventId, jobName } = ctx.match.groups!;
+				const { action, eventId, jobName, userId } = ctx.match.groups!;
 				const user = ctx.from;
-				console.info('Received week-plan callbackQuery', { action, eventId, jobName, user });
+				console.info('Received week-plan callbackQuery', { action, eventId, jobName, user, userId });
 
 				const eventProps = await weekPlanApi.getEventsProps(eventId);
 				const messageId = Number(eventProps.planMessageId);
@@ -370,7 +458,7 @@ export class WeekPlanBot {
 				}
 
 				if (action === 'unassign') {
-					await weekPlanApi.unassignFromJob(eventProps.type, eventId, assignedJobs, jobName, user);
+					await weekPlanApi.unassignFromJob(eventProps.type, eventId, assignedJobs, jobName, userId ? parseInt(userId) : user.id);
 					await this.updateWeekPlan(messageId);
 					return ctx.answerCallbackQuery({ text: 'You removed yourself from this job.' });
 				}
@@ -395,6 +483,61 @@ export class WeekPlanBot {
 		);
 	}
 
+	private setupInlineQuery() {
+		this.bot.inlineQuery(/.*/, async (ctx) => {
+			const query = ctx.inlineQuery.query;
+			const match = query.match(/^#(?<eventId>\w+)_(?<jobName>\w+) (?<search>.*)$/);
+
+			if (match !== null && 'groups' in match && match.groups) {
+				const { search } = match.groups;
+
+				const allUsers = await users.getAll();
+				const filteredUsers = allUsers
+					.filter(
+						(user) =>
+							user.first_name.includes(search) ||
+							(user.last_name && user.last_name.includes(search)) ||
+							(user.username && user.username.includes(search))
+					)
+					.map((user) =>
+						InlineQueryResultBuilder.contact(
+							user.id!.toString(),
+							user.username ? `@${user.username}` : '',
+							user.first_name,
+							{
+								last_name: user.last_name
+							}
+						)
+					);
+
+				// TODO limit to 50 results, as Telegram has a limit on inline query results
+				// TODO find out how next offset works for inline queries, as Telegram has a limit on inline query results
+
+				return ctx.answerInlineQuery(filteredUsers);
+			}
+
+			return ctx.answerInlineQuery([]);
+		});
+
+		this.bot.on('chosen_inline_result', async ctx => {
+			const query = ctx.chosenInlineResult.query;
+			const match = query.match(/^#(?<eventId>\w+)_(?<jobName>\w+) (?<search>.*)$/);
+
+			if (match !== null && 'groups' in match && match.groups) {
+				const { eventId, jobName } = match.groups;
+				const eventProps = await weekPlanApi.getEventsProps(eventId);
+				const assignedJobs: EventPropsJobs = JSON.parse(eventProps.jobs);
+				const user = await users.getById(ctx.chosenInlineResult.result_id);
+
+				if (user) {
+					await weekPlanApi.assignToJob(eventProps.type, eventId, assignedJobs, jobName, user);
+				}
+			}
+
+			// TODO how to delete the inline query message?
+		});
+	}
+
 	private setupStartHandler() {
 		const askDetailsReply = <R>(
 			type: string,
@@ -408,8 +551,8 @@ export class WeekPlanBot {
 		this.bot.command('start', async (ctx) => {
 			const match = ctx.match.match(/^plan_(?<eventId>\w+)_(?<jobName>\w+)$/);
 
-			if (match !== null && 'groups' in match) {
-				const { eventId, jobName } = match.groups!;
+			if (match !== null && 'groups' in match && match.groups) {
+				const { eventId, jobName } = match.groups;
 				const user = ctx.from!;
 
 				console.info('Received week-plan start command', { eventId, jobName, user });

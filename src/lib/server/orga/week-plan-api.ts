@@ -257,11 +257,11 @@ class WeekPlanApi {
 		eventId: string,
 		assignedJobs: EventPropsJobs,
 		jobName: string,
-		user: TelegramUser
+		userId: number
 	) {
 		// TODO validations ?
 
-		const index = assignedJobs[jobName].persons.findIndex((person) => person.id === user.id);
+		const index = assignedJobs[jobName].persons.findIndex((person) => person.id === userId);
 
 		if (index > -1) {
 			assignedJobs[jobName].persons.splice(index, 1);

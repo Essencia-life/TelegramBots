@@ -21,6 +21,11 @@ class Users {
 		return users.map((u) => u?.[0]).filter(Boolean);
 	}
 
+	async getById(userId: string) {
+		const [result] = await redis.json.get<TelegramUser[]>(storageKeyPrefix + userId, '$') ?? [];
+		return result;
+	}
+
 	async addUser({ id, first_name, last_name, username }: TelegramUser) {
 		return redis.json.set(
 			storageKeyPrefix + id,
