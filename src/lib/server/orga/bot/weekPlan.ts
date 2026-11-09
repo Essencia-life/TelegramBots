@@ -1,4 +1,4 @@
-import { type Bot } from 'grammy';
+import { GrammyError, type Bot } from 'grammy';
 import type {
 	InputRichBlock,
 	InputRichMessage,
@@ -299,33 +299,30 @@ export class WeekPlanBot {
 			]
 		});
 
-		if (replaceCallbackQueryMessage && callbackQueryId) {
-			await this.bot.api.sendRichMessage(
+		const send = (extra: object) =>
+			this.bot.api.sendRichMessage(
 				BOT_HOME_GROUP_CHAT_ID,
 				{ blocks },
 				{
 					message_thread_id: topics.weeklyJobs,
-					ephemeral_message_parameters: {
-						receiver_user_id: user.id,
-						callback_query_id: callbackQueryId,
-						replace_callback_query_message: true
-					}
+					ephemeral_message_parameters: { receiver_user_id: user.id, ...extra }
 				}
 			);
+
+		if (replaceCallbackQueryMessage && callbackQueryId) {
+			try {
+				await send({ callback_query_id: callbackQueryId, replace_callback_query_message: true });
+				return;
+			} catch (error) {
+				if (!(error instanceof GrammyError) || error.error_code !== 400) throw error;
+				console.warn('Replacing week plan failed, sending plain ephemeral', error.description);
+			}
+			// Fallback without callback_query_id: the query may already be consumed
+			await send({});
 			return;
 		}
 
-		await this.bot.api.sendRichMessage(
-			BOT_HOME_GROUP_CHAT_ID,
-			{ blocks },
-			{
-				message_thread_id: topics.weeklyJobs,
-				ephemeral_message_parameters: {
-					receiver_user_id: user.id,
-					...(callbackQueryId && { callback_query_id: callbackQueryId })
-				}
-			}
-		);
+		await send(callbackQueryId ? { callback_query_id: callbackQueryId } : {});
 	}
 
 	private setupCallbackHandler() {
@@ -338,7 +335,7 @@ export class WeekPlanBot {
 			}
 
 			await this.sendUserWeekSummary(messageId, user, ctx.callbackQuery.id, true);
-			return ctx.answerCallbackQuery();
+			return ctx.answerCallbackQuery().catch(() => {});
 		});
 
 		this.bot.callbackQuery('back_to_week', async (ctx) => {
