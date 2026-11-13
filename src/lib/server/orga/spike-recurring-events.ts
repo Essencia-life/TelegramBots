@@ -198,7 +198,8 @@ export async function runSpike({ keep = false, inspect = '' } = {}): Promise<str
 		const afterCancel = await list(['type=spike']);
 		check(afterCancel.length === 4, 'Abgesagte Instanz verschwindet aus singleEvents-Liste', `${afterCancel.length}`);
 
-		// 10. Zeitänderung am Master (nur per API; UI-Verhalten manuell testen!)
+		// 10. nur ohne keep: würde sonst die Ausnahmen für den manuellen UI-Test löschen
+		if (!keep) {
 		await patch(masterId, {
 			start: { dateTime: monday.set({ hour: 15 }).toISO()!, timeZone: TZ },
 			end: { dateTime: monday.set({ hour: 16 }).toISO()!, timeZone: TZ }
@@ -212,6 +213,7 @@ export async function runSpike({ keep = false, inspect = '' } = {}): Promise<str
 			tueNow ? `Start jetzt ${tueNow.start?.dateTime}` : 'Dienstags-Instanz nicht gefunden'
 		);
 		info('Abgesagter Freitag nach Zeitänderung', afterTime.length === 4 ? 'bleibt abgesagt' : 'wieder da!');
+		}
 
 		log('\n--- Manueller UI-Test (wichtigster Punkt!) ---');
 		log('Rufe den Endpoint mit ?keep=1 auf, öffne den SPIKE-Termin im Kalender, wähle "Alle Termine"');
