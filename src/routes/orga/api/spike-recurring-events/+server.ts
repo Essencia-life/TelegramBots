@@ -1,14 +1,9 @@
 import { error, type RequestHandler } from '@sveltejs/kit';
-import { ORGA_BOT_SECRET_TOKEN } from '$env/static/private';
 import { runSpike } from '$lib/server/orga/spike-recurring-events';
 
 // Temporärer Endpoint für den Serien-Spike, nach der Auswertung wieder löschen.
-// Aufruf: curl -H "Authorization: Bearer $ORGA_BOT_SECRET_TOKEN" "<host>/orga/api/spike-recurring-events[?keep=1|?inspect=<masterId>]"
-export const GET: RequestHandler = async ({ request, url }) => {
-	if (request.headers.get('authorization') !== `Bearer ${ORGA_BOT_SECRET_TOKEN}`) {
-		return error(401, 'Unauthorized');
-	}
-
+// Aufruf: GET /orga/api/spike-recurring-events[?keep=1|?inspect=<masterId>]
+export const GET: RequestHandler = async ({ url }) => {
 	try {
 		const report = await runSpike({
 			keep: url.searchParams.has('keep'),
