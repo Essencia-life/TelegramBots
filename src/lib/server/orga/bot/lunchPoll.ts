@@ -40,9 +40,8 @@ export class LunchPollBot {
 		const startOfDay = date.startOf('day').toJSDate();
 		const endOfDay = date.endOf('day').toJSDate();
 
-		const events = await calendarByName.community.getEvents([], startOfDay, endOfDay);
+		const events = await calendarByName.community.getEvents(['type=lunch'], startOfDay, endOfDay);
 
-		// timed events only; the poll closes relative to the start
-		return events.find((event) => event.start?.dateTime && /lunch/i.test(event.summary ?? ''));
+		return events[0];
 	}
 }
