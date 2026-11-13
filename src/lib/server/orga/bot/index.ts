@@ -10,7 +10,7 @@ import { errorHandlerCallback } from '$lib/server/bot-utils';
 export const bot = new Bot(ORGA_BOT_TOKEN);
 export const usersBot = new UsersBot(bot);
 export const agendaBot = new AgendaBot(bot);
-export const weekPlanBot = new WeekPlanBot(bot);
+export const weekPlanBot = new WeekPlanBot(bot, (date) => agendaBot.refresh(date));
 export const spamProtectionBot = new SpamProtectionBot(bot);
 export const lunchPollBot = new LunchPollBot(bot);
 
