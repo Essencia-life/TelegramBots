@@ -66,10 +66,11 @@ export async function runSpike({ keep = false, inspect = '', rdate = false } = {
 
 	if (inspect) {
 		const items = (await list([], monday, monday.plus({ days: 300 }))).filter(
-			(e) => e.recurringEventId === inspect
+			(e) => inspect === 'all' || e.recurringEventId === inspect
 		);
 		log(`${items.length} Instanzen von ${inspect} (nächste 300 Tage):`);
-		for (const e of items) log(`- ${e.id}\n  ${e.start?.dateTime}  ${e.status}\n  ${JSON.stringify(priv(e))}`);
+		for (const e of items)
+			log(`- ${e.id} (Serie ${e.recurringEventId ?? '-'})\n  ${e.start?.dateTime}  ${e.status}\n  ${JSON.stringify(priv(e))}`);
 		return out.join('\n');
 	}
 
