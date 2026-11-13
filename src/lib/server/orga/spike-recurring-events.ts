@@ -7,6 +7,8 @@ import { randomBytes } from 'node:crypto';
 import { google, type calendar_v3 } from 'googleapis';
 import { DateTime } from 'luxon';
 import { env } from '$env/dynamic/private';
+import { matchesRelationToLunarPhase } from './utils/lunar-matching';
+import lunarProvider from './utils/lunar-provider';
 
 type Ev = calendar_v3.Schema$Event;
 
@@ -15,7 +17,7 @@ const priv = (e?: Ev) => (e?.extendedProperties?.private ?? {}) as Record<string
 const errMsg = (e: any) =>
 	`${e?.code ?? e?.status ?? ''} ${e?.errors?.[0]?.message ?? e?.message ?? e}`.trim();
 
-export async function runSpike({ keep = false, inspect = '' } = {}): Promise<string> {
+export async function runSpike({ keep = false, inspect = '', rdate = false } = {}): Promise<string> {
 	const calendarId = env.TEST_CALENDAR_ID;
 	if (!calendarId) throw new Error('TEST_CALENDAR_ID ist nicht gesetzt');
 	if ([env.COMMUNITY_CALENDAR_ID, env.EVENTS_CALENDAR_ID].includes(calendarId)) {
@@ -41,14 +43,14 @@ export async function runSpike({ keep = false, inspect = '' } = {}): Promise<str
 
 	const monday = DateTime.now().setZone(TZ).plus({ weeks: 1 }).startOf('week');
 
-	const list = async (filter: string[] = []) =>
+	const list = async (filter: string[] = [], from = monday, to = monday.plus({ days: 5 })) =>
 		(
 			await cal.events.list({
 				calendarId,
 				singleEvents: true,
 				orderBy: 'startTime',
-				timeMin: monday.toISO()!,
-				timeMax: monday.plus({ days: 5 }).toISO()!,
+				timeMin: from.toISO()!,
+				timeMax: to.toISO()!,
 				timeZone: TZ,
 				privateExtendedProperty: filter
 			})
@@ -63,9 +65,108 @@ export async function runSpike({ keep = false, inspect = '' } = {}): Promise<str
 		).data;
 
 	if (inspect) {
-		const items = (await list()).filter((e) => e.recurringEventId === inspect);
-		log(`${items.length} Instanzen von ${inspect} (nächste Woche):`);
+		const items = (await list([], monday, monday.plus({ days: 300 }))).filter(
+			(e) => e.recurringEventId === inspect
+		);
+		log(`${items.length} Instanzen von ${inspect} (nächste 300 Tage):`);
 		for (const e of items) log(`- ${e.id}\n  ${e.start?.dateTime}  ${e.status}\n  ${JSON.stringify(priv(e))}`);
+		return out.join('\n');
+	}
+
+	if (rdate) {
+		// Moon-Regel aus dem echten Code: letzter Freitag vor Vollmond, 14:00 Lisbon
+		const rule = { weekday: 5, phase: 'FULL_MOON', relation: 'LAST_BEFORE' } as const;
+		const days: DateTime[] = [];
+		for (let i = 1; i <= 260; i++) {
+			const d = DateTime.now().setZone(TZ).plus({ days: i }).set({ hour: 14, minute: 0, second: 0, millisecond: 0 });
+			if (matchesRelationToLunarPhase(d.toJSDate(), rule, lunarProvider)) days.push(d);
+		}
+		if (days.length < 4) throw new Error(`Nur ${days.length} Mond-Termine berechnet`);
+
+		const extra = days.pop()!; // wird später angehängt, wie bei einer jährlichen Nachpflege
+		const fmt = (d: DateTime) => d.toFormat("yyyyLLdd'T'HHmmss");
+		const rdateLine = (ds: DateTime[]) => `RDATE;TZID=${TZ}:${ds.map(fmt).join(',')}`;
+		const from = DateTime.now().setZone(TZ);
+		const to = from.plus({ days: 300 });
+		const dateOf = (e: Ev) => DateTime.fromISO(e.start!.dateTime!).setZone(TZ).toISODate();
+		const moonId = 'spkm' + randomBytes(5).toString('hex');
+		let moonCreated = false;
+
+		try {
+			await cal.events.insert({
+				calendarId,
+				requestBody: {
+					id: moonId,
+					summary: 'SPIKE Mond (kann gelöscht werden)',
+					start: { dateTime: days[0].toISO()!, timeZone: TZ },
+					end: { dateTime: days[0].plus({ hours: 1 }).toISO()!, timeZone: TZ },
+					recurrence: [rdateLine(days.slice(1))],
+					extendedProperties: {
+						private: {
+							source: 'week-plan',
+							type: 'spike-moon',
+							v: '2',
+							'job.fire': JSON.stringify({ title: 'Fire Keeper', persons: 1 })
+						}
+					}
+				}
+			});
+			moonCreated = true;
+			ok('Serie nur mit RDATE (ohne RRULE) wird akzeptiert', rdateLine(days.slice(1)));
+
+			const expected = days.map((d) => d.toISODate());
+			const inst = await list(['type=spike-moon'], from, to);
+			const got = inst.map(dateOf);
+			check(
+				JSON.stringify(got) === JSON.stringify(expected),
+				`Instanzen entsprechen den ${expected.length} berechneten Mond-Terminen`,
+				`erwartet ${expected.join(' ')} | erhalten ${got.join(' ')}`
+			);
+			check(!!priv(inst[1])['job.fire'], 'Instanzen erben job.* auch bei RDATE-Serie');
+			info('Beispiel Instanz-ID', inst[1].id ?? '');
+
+			// Ausnahmen anlegen, dann einen Termin nachträglich anhängen
+			await patch(inst[1].id!, {
+				extendedProperties: {
+					private: { 'assign.fire': JSON.stringify({ persons: [{ id: 1, first_name: 'Test' }] }) }
+				}
+			});
+			await patch(inst[2].id!, { status: 'cancelled' });
+			await patch(moonId, { recurrence: [rdateLine([...days.slice(1), extra])] });
+
+			const after = await list(['type=spike-moon'], from, to);
+			const kept = after.find((e) => e.id === inst[1].id);
+			check(
+				after.some((e) => dateOf(e) === extra.toISODate()),
+				'Nachträglich angehängter Mond-Termin erscheint',
+				extra.toISODate() ?? ''
+			);
+			check(
+				!!kept && !!priv(kept)['assign.fire'],
+				'Eintragung überlebt das Anhängen eines RDATE',
+				kept ? 'Instanz noch da' : 'Instanz-ID nicht mehr vorhanden'
+			);
+			check(
+				after.length === days.length,
+				'Abgesagter Termin bleibt nach dem Anhängen abgesagt',
+				`${after.length} Instanzen (bleibt abgesagt: ${days.length}, zurückgesetzt: ${days.length + 1})`
+			);
+
+			log('\n--- Manueller UI-Test ---');
+			log('Mit ?rdate&keep=1 aufrufen, den SPIKE-Mond-Termin im Kalender öffnen:');
+			log('Wird die Serie sinnvoll angezeigt? Titel für "Alle Termine" ändern, dann prüfen mit:');
+			log(`  GET /orga/api/spike-recurring-events?inspect=${moonId}`);
+		} catch (e) {
+			log('\nSpike abgebrochen: ' + errMsg(e));
+		} finally {
+			if (moonCreated && keep) {
+				log(`\nkeep: Master ${moonId} bleibt im Test-Kalender bestehen.`);
+			} else if (moonCreated) {
+				await cal.events.delete({ calendarId, eventId: moonId }).catch(() => {});
+				log(`\nAufgeräumt: Master ${moonId} (inkl. Instanzen) gelöscht.`);
+			}
+		}
+
 		return out.join('\n');
 	}
 
@@ -160,6 +261,28 @@ export async function runSpike({ keep = false, inspect = '' } = {}): Promise<str
 			priv(wed2)['job.chef']?.includes('CHANGED') ? 'sieht neuen Wert (live)' : 'sieht alten Wert'
 		);
 		info('Neuer job.dessert auf Di?', priv(tue2)['job.dessert'] ? 'ja' : 'nein');
+
+		// 5b. Einen Job nur an einer Instanz überschreiben (z.B. 3 statt 2 Chefs am Dienstag)
+		await patch(tue.id!, {
+			extendedProperties: {
+				private: { 'job.chef': JSON.stringify({ title: 'OVERRIDE', persons: 3 }) }
+			}
+		});
+		await patch(masterId, {
+			extendedProperties: {
+				private: { 'job.chef': JSON.stringify({ title: 'CHANGED2', persons: 2 }) }
+			}
+		});
+		const [tue3, wed3] = await Promise.all([get(tue.id!), get(wed.id!)]);
+		check(
+			priv(tue3)['job.chef']?.includes('OVERRIDE') === true,
+			'Job-Override an einer Instanz bleibt nach erneuter Master-Änderung erhalten'
+		);
+		check(
+			priv(wed3)['job.chef']?.includes('CHANGED2') === true,
+			'Andere Instanzen sehen weiter die Master-Definition (live)'
+		);
+		check(!!priv(tue3)['job.cleaning'], 'Übrige Jobs der überschriebenen Instanz werden weiter geerbt');
 
 		// 6. Filter findet Ausnahmen weiterhin?
 		const afterFilter = await list(['source=week-plan', 'type=spike']);
