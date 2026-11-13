@@ -1,8 +1,10 @@
 import { BOT_HOME_GROUP_CHAT_ID, VERCEL_BRANCH_URL } from '$env/static/private';
 import { InlineKeyboard, type Bot } from 'grammy';
 import { type CalendarEvent } from '$lib/server/calendar';
+import * as store from '../plan-store';
+import type { Plan } from '../plan-store';
 import { DateTime } from 'luxon';
-import { calendarByName, type EventPropsJobs } from '../week-plan-api';
+import { calendarByName, dateKey, toPlanEvent, type PlanEvent } from '../week-plan-api';
 import { formatTelegramUsers } from './weekPlan';
 import topics from '../utils/topics';
 import type { InlineKeyboardMarkup } from 'grammy/types';
@@ -17,8 +19,9 @@ export class AgendaBot {
 		const events = await this.getEventsByDate(tomorrow);
 
 		if (events.length) {
-			const text = formatAgenda(tomorrow.toJSDate(), events);
-			const keyboard = generateAvailableJobButtons(events);
+			const plans = await getPlans(events);
+			const text = formatAgenda(tomorrow.toJSDate(), events, plans);
+			const keyboard = generateAvailableJobButtons(events, plans);
 
 			const message = await this.bot.api.sendMessage(BOT_HOME_GROUP_CHAT_ID, text, {
 				parse_mode: 'HTML',
@@ -29,6 +32,7 @@ export class AgendaBot {
 				}
 			});
 
+			await store.setMessageId('agenda', dateKey(tomorrow), message.message_id);
 			await this.watchCalendar(tomorrow, message.message_id);
 		} else {
 			console.info('No agenda for today');
@@ -39,8 +43,9 @@ export class AgendaBot {
 		console.info(`Update agenda for date=${date.toISODate()} messageId=${messageId}`);
 
 		const events = await this.getEventsByDate(date);
-		const text = formatAgenda(date.toJSDate(), events);
-		const keyboard = generateAvailableJobButtons(events);
+		const plans = await getPlans(events);
+		const text = formatAgenda(date.toJSDate(), events, plans);
+		const keyboard = generateAvailableJobButtons(events, plans);
 
 		try {
 			await this.bot.api.editMessageText(BOT_HOME_GROUP_CHAT_ID, messageId, text, {
@@ -53,6 +58,12 @@ export class AgendaBot {
 		} catch (err) {
 			console.error(err);
 		}
+	}
+
+	/** Sign-ups do not touch the calendar, so the calendar watch does not fire for them. */
+	public async refresh(date: DateTime) {
+		const messageId = await store.getMessageId('agenda', dateKey(date));
+		if (messageId) await this.updateAgenda(date, messageId);
 	}
 
 	private async getEventsByDate(date: DateTime) {
@@ -117,35 +128,33 @@ function formatDuration(event: CalendarEvent) {
 	return parts.length ? `(${parts.join(' ')})` : '';
 }
 
-function formatJobs(eventProps?: Record<string, string>) {
-	console.log(eventProps);
-	if (eventProps && eventProps.jobs) {
-		const assignedJobs: EventPropsJobs = JSON.parse(eventProps.jobs);
-		const block = [];
-
-		for (const { title, persons, details } of Object.values(assignedJobs)) {
-			console.log(title, details);
-			if (!details) {
-				block.push(`${title}: ${formatTelegramUsers(persons)}`);
-			} else {
-				const [firstLine, rest] = details.split('\n', 2);
-
-				if (!rest) {
-					block.push(`${title}: ${firstLine} with ${formatTelegramUsers(persons)}`);
-				} else {
-					block.push(`${title}: ${firstLine} with ${formatTelegramUsers(persons)}`);
-					block.push(rest);
-				}
-			}
-		}
-
-		return block.join('\n');
-	}
-
-	return '';
+/** sign-ups of the events that have jobs, by event id */
+async function getPlans(events: CalendarEvent[]) {
+	const planEvents = events.flatMap((event) => toPlanEvent(event) ?? []);
+	const plans = await Promise.all(planEvents.map(({ type, date }) => store.getPlan(type, date)));
+	return new Map(planEvents.map((planEvent, i) => [planEvent.event.id!, { planEvent, plan: plans[i] }]));
 }
 
-function formatEvent(event: CalendarEvent): string {
+type Plans = Awaited<ReturnType<typeof getPlans>>;
+
+function formatJobs(planEvent: PlanEvent | undefined, plan: Plan | undefined) {
+	const block: string[] = [];
+
+	for (const { key, title } of planEvent?.jobs ?? []) {
+		const { persons = [], details } = plan?.[key] ?? {};
+		if (!details) {
+			block.push(`${title}: ${formatTelegramUsers(persons)}`);
+		} else {
+			const [firstLine, rest] = details.split('\n', 2);
+			block.push(`${title}: ${firstLine} with ${formatTelegramUsers(persons)}`);
+			if (rest) block.push(rest);
+		}
+	}
+
+	return block.join('\n');
+}
+
+function formatEvent(event: CalendarEvent, plans: Plans): string {
 	const firstLine = [event.summary];
 
 	if (event.start?.dateTime) {
@@ -164,7 +173,7 @@ function formatEvent(event: CalendarEvent): string {
 	const lines = [
 		firstLine.join(' '),
 		formatLocation(event.location),
-		formatJobs(event.extendedProperties?.private),
+		formatJobs(plans.get(event.id!)?.planEvent, plans.get(event.id!)?.plan),
 		transformDescription(event.description ?? '')
 	].filter(Boolean);
 
@@ -177,33 +186,28 @@ function byStartDate(a: CalendarEvent, b: CalendarEvent) {
 	);
 }
 
-function formatAgenda(date: Date, events: CalendarEvent[]) {
+function formatAgenda(date: Date, events: CalendarEvent[], plans: Plans) {
 	return `🗓️ <b>Agenda for ${date.toLocaleDateString('en', { weekday: 'long' })}</b>
 
-${events.map(formatEvent).join('\n\n')}`;
+${events.map((event) => formatEvent(event, plans)).join('\n\n')}`;
 }
 
-function generateAvailableJobButtons(events: CalendarEvent[]): InlineKeyboardMarkup {
+function generateAvailableJobButtons(events: CalendarEvent[], plans: Plans): InlineKeyboardMarkup {
 	let keyboard = new InlineKeyboard();
 
 	for (const event of events) {
+		const entry = plans.get(event.id!);
 		// Skip weekly tasks
-		if (!event.start?.dateTime) {
-			continue;
-		}
+		if (!entry || !event.start?.dateTime) continue;
 
-		const assignedJobs: EventPropsJobs = JSON.parse(
-			event.extendedProperties?.private?.jobs ?? '{}'
-		);
-
-		for (const [jobName, { title, persons }] of Object.entries(assignedJobs)) {
-			// TODO replace manual jobName check with reminder boolean from job config
-			if (persons.length === 0 && jobName !== 'guide') {
+		const { type, date, jobs } = entry.planEvent;
+		for (const { key, title, sos } of jobs) {
+			if (sos && !entry.plan[key]?.persons.length) {
 				keyboard = keyboard
 					.row()
 					.text(
-						`🆘 I will do ${title} on ${new Date(event.start?.dateTime).toLocaleDateString('en', { weekday: 'long' })}!`,
-						`plan:${event.id}:${jobName}`
+						`🆘 I will do ${title} on ${new Date(event.start.dateTime).toLocaleDateString('en', { weekday: 'long' })}!`,
+						`plan:${type}:${date}:${key}`
 					);
 			}
 		}
