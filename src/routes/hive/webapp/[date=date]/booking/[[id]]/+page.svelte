@@ -12,7 +12,7 @@
 	import { SvelteDate } from 'svelte/reactivity';
 	import ms from 'ms';
 	import type { TimePeriod } from '$lib/server/calendar';
-	import { Modal, Label, Input, Button } from 'flowbite-svelte';
+	import { Modal, Label, Input, Button, Toggle } from 'flowbite-svelte';
 	import { page } from '$app/state';
 
 	const { params, data }: PageProps = $props();
@@ -72,6 +72,7 @@
 	let duration = $state(ms('30m'));
 
 	let loading = $state(false);
+	let isPrivate = $state(false);
 
 	async function onsubmit(event: SubmitEvent) {
 		event.preventDefault();
@@ -94,7 +95,8 @@
 				id: params.id,
 				startDate,
 				endDate,
-				description: description.trim()
+				description: description.trim(),
+				isPrivate
 			});
 
 			loading = false;
@@ -103,7 +105,8 @@
 			const bookingId = await createBooking({
 				startDate,
 				endDate,
-				description: description.trim()
+				description: description.trim(),
+				isPrivate
 			});
 
 			loading = false;
@@ -233,6 +236,13 @@
 			id="booking-reason"
 			class="col-span-2"
 		/>
+
+		<Toggle class="col-span-3" bind:checked={isPrivate}>
+			{#snippet offLabel()}
+				🤫 Silent co-working
+			{/snippet}
+			🔒 Private - do not disturb
+		</Toggle>
 	</form>
 
 	{#snippet footer()}

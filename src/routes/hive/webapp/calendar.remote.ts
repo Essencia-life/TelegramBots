@@ -31,9 +31,10 @@ export const createBooking = command(
 	z.object({
 		startDate: z.iso.datetime(),
 		endDate: z.iso.datetime(),
-		description: z.string()
+		description: z.string(),
+		isPrivate: z.boolean()
 	}),
-	async ({ startDate, endDate, description }) => {
+	async ({ startDate, endDate, description, isPrivate }) => {
 		const user = getSession(HIVE_BOT_TOKEN).user;
 
 		const coWorkingCalendar = new Calendar(CO_WORKING_CALENDAR_ID);
@@ -57,7 +58,8 @@ export const createBooking = command(
 			],
 			extendedProperties: {
 				shared: {
-					telegramUserId: String(user.id)
+					telegramUserId: String(user.id),
+					isPrivate: String(isPrivate)
 				}
 			}
 		});
@@ -100,9 +102,10 @@ export const updateBooking = command(
 		id: z.string(),
 		startDate: z.iso.datetime(),
 		endDate: z.iso.datetime(),
-		description: z.string()
+		description: z.string(),
+		isPrivate: z.boolean()
 	}),
-	async ({ id, startDate, endDate, description }) => {
+	async ({ id, startDate, endDate, description, isPrivate }) => {
 		getSession(HIVE_BOT_TOKEN);
 
 		// TODO verify user has permission to update the booking
@@ -118,6 +121,11 @@ export const updateBooking = command(
 			end: {
 				dateTime: endDate,
 				timeZone: 'Europe/Lisbon'
+			},
+			extendedProperties: {
+				shared: {
+					isPrivate: String(isPrivate)
+				}
 			}
 		});
 

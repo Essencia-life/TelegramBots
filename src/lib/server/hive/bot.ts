@@ -99,8 +99,11 @@ function generateBookingMessage(booking: CalendarEvent, deleted = false) {
 		timeZone: 'Europe/Lisbon'
 	})}`;
 
+	const isPrivate = booking.extendedProperties?.shared?.isPrivate === 'true';
+	const privacy = isPrivate ? '🔒 Please respect the privacy and do not disturb.' : '🤫 Silent co-working is accepted';
+
 	return strikethrough(
-		`💻 I booked the Hive for ${booking.description}\n\non ${tgTime(startDate, time)}`
+		`💻 I booked the Hive for ${booking.description}\n\non ${tgTime(startDate, time)}\n\n<i>${privacy}</i>`
 	);
 }
 

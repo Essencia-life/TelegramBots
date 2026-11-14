@@ -38,10 +38,16 @@ function formatEvent(event: CalendarEvent) {
 			: '';
 
 	const isPersonalBooking = !!event.extendedProperties?.shared?.telegramUserId;
+	const isPrivate = event.extendedProperties?.shared?.isPrivate === 'true';
 	const title = escapeHtml(event.summary!);
 	const description = event.description && isPersonalBooking ? escapeHtml(event.description) : '';
+	const descriptionSuffix = isPersonalBooking
+		? isPrivate
+			? '\n\n<i>🔒 Please respect the privacy and do not disturb.</i>'
+			: '\n\n<i>🤫 Silent co-working is accepted</i>'
+		: '';
 
-	return `<blockquote>${timeString}\n<b>${title}</b> ${description}</blockquote>`;
+	return `<blockquote>${timeString}\n<b>${title}</b> ${description}${descriptionSuffix}</blockquote>`;
 }
 
 export async function generateAgenda() {
