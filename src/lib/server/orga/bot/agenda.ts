@@ -106,8 +106,26 @@ function transformDescription(description: string): string {
 	);
 }
 
+/**
+ * Resource calendars are named "{group}-{floor}-{name} (capacity)", e.g. "Farmhouse-1-Room A (4)": only the name is shown.
+ * Other locations (free text, no capacity) stay as they are. Several rooms arrive separated by commas.
+ */
+export function parseLocation(location: string) {
+	return location
+		.split(', ')
+		.map((room) => {
+			const capacity = /\s*\(\d+\)\s*$/;
+			const parts = room.replace(capacity, '').trim().split(/\s*-\s*/);
+			if (parts.length >= 3 && /^\d+$/.test(parts[1])) return parts.slice(2).join('-');
+			// without a floor it is only a resource name when the capacity is there, so "Hive - back door" stays
+			if (parts.length >= 2 && capacity.test(room)) return parts.slice(1).join('-');
+			return room;
+		})
+		.join(', ');
+}
+
 function formatLocation(location?: string | null) {
-	return location ? `<i>\uFE6B${location.replace(/^(\w+)-\d+-\1 \(\d+\)$/, '$1')}</i>` : '';
+	return location ? `<i>\uFE6B${parseLocation(location)}</i>` : '';
 }
 
 function formatDuration(event: CalendarEvent) {
