@@ -42,9 +42,9 @@ async function getPlanEvents(filter: string[], start: Date, end: Date) {
 	return perCalendar.flat().flatMap((event) => toPlanEvent(event) ?? []);
 }
 
-/** Monday to Friday, like the week plan message. */
+/** Monday to Sunday, so weekend events are part of the week plan too. */
 export const getWeekEvents = (weekStart: DateTime) =>
-	getPlanEvents([], weekStart.startOf('day').toJSDate(), weekStart.plus({ days: 4 }).endOf('day').toJSDate());
+	getPlanEvents([], weekStart.startOf('day').toJSDate(), weekStart.plus({ days: 6 }).endOf('day').toJSDate());
 
 /** The occurrence of a kind of event on a day, as referenced by buttons (`type` + yyyymmdd). */
 export async function findPlanEvent(type: string, date: string) {

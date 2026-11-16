@@ -8,6 +8,7 @@ import type {
 import { DateTime } from 'luxon';
 import type { CalendarEvent } from '../calendar';
 import {
+	calendarByName,
 	dateKey,
 	findPlanEvent,
 	getWeekEvents,
@@ -17,7 +18,7 @@ import {
 import * as store from '../plan-store';
 import type { Plan } from '../plan-store';
 import type { TelegramUser } from '../users';
-import { BOT_HOME_GROUP_CHAT_ID } from '$env/static/private';
+import { BOT_HOME_GROUP_CHAT_ID, VERCEL_BRANCH_URL } from '$env/static/private';
 import topics from '../utils/topics';
 
 type PlannedEvent = PlanEvent & { plan: Plan };
@@ -53,9 +54,26 @@ export class WeekPlanBot {
 		);
 
 		await store.setMessageId('week', dateKey(weekStart), message.message_id);
+		await this.watchCalendar(weekStart).catch((error) => console.error('Could not watch the calendars', error));
 	}
 
-	private async updateWeekPlan(weekStart: DateTime) {
+	/** The calendar changes the week plan shows (titles, times, jobs) update the message through a webhook. */
+	private watchCalendar(weekStart: DateTime) {
+		const end = weekStart.plus({ days: 6 }).endOf('day');
+		return Promise.all(
+			Object.values(calendarByName).map((calendar) =>
+				calendar.watchEvents(weekStart.toJSDate(), end.toJSDate(), {
+					id: crypto.randomUUID(),
+					token: JSON.stringify({ weekStart: weekStart.toISODate() }),
+					type: 'webhook',
+					address: `https://${VERCEL_BRANCH_URL}/orga/api/telegram/week-plan`,
+					expiration: end.toMillis().toString()
+				})
+			)
+		);
+	}
+
+	public async updateWeekPlan(weekStart: DateTime) {
 		const messageId = await store.getMessageId('week', dateKey(weekStart));
 		if (!messageId) return;
 
@@ -80,7 +98,7 @@ export class WeekPlanBot {
 				type: 'heading',
 				size: 1,
 				text: `Week of ${weekStart.toLocaleString({ day: 'numeric' })}–${weekStart
-					.plus({ days: 4 })
+					.plus({ days: 6 })
 					.setLocale('en-DE')
 					.toLocaleString({ day: 'numeric', month: 'numeric' })}`
 			},
@@ -95,7 +113,7 @@ export class WeekPlanBot {
 		for (const item of [...events].sort(
 			(a, b) => getEventDate(a.event).toMillis() - getEventDate(b.event).toMillis()
 		)) {
-			if (item.event.start?.date && !item.event.start.dateTime) {
+			if (isMultiDay(item.event)) {
 				allWeekEvents.push(item);
 				continue;
 			}
@@ -109,7 +127,9 @@ export class WeekPlanBot {
 			blocks.push(...this.buildEventBlocks(allWeekEvents));
 		}
 
-		for (let weekday = 0; weekday < 5; weekday++) {
+		for (let weekday = 0; weekday < 7; weekday++) {
+			// Saturday and Sunday only show up when something is planned
+			if (weekday >= 5 && !eventsByWeekday.has(weekday)) continue;
 			const date = weekStart.plus({ days: weekday });
 			blocks.push({
 				type: 'heading',
@@ -233,7 +253,7 @@ export class WeekPlanBot {
 
 		for (const { event, type, date, jobs, plan } of events) {
 			const eventLabel =
-				event.start?.date && !event.start.dateTime
+				isMultiDay(event)
 					? 'All week'
 					: getEventDate(event).toLocaleString({ weekday: 'long', day: 'numeric', month: 'numeric' });
 			let eventHeadingAdded = false;
@@ -439,6 +459,12 @@ export class WeekPlanBot {
 			await ctx.react('👍');
 		});
 	}
+}
+
+/** All-day events over several days ("Fairy of the Week") belong to the whole week; a single all-day event to its day. */
+function isMultiDay(event: CalendarEvent) {
+	if (!event.start?.date || !event.end?.date) return false;
+	return DateTime.fromISO(event.end.date).diff(DateTime.fromISO(event.start.date), 'days').days > 1;
 }
 
 function getEventDate(event: CalendarEvent) {
