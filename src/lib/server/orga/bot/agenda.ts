@@ -1,5 +1,5 @@
 import { BOT_HOME_GROUP_CHAT_ID, VERCEL_BRANCH_URL } from '$env/static/private';
-import { InlineKeyboard, type Bot } from 'grammy';
+import { GrammyError, InlineKeyboard, type Bot } from 'grammy';
 import { type CalendarEvent } from '$lib/server/calendar';
 import * as store from '../plan-store';
 import type { Plan } from '../plan-store';
@@ -56,7 +56,8 @@ export class AgendaBot {
 				}
 			});
 		} catch (err) {
-			console.error(err);
+			// nothing changed for the agenda (e.g. another event of that calendar was edited): Telegram answers 400
+			if (!(err instanceof GrammyError) || !/message is not modified/i.test(err.description)) console.error(err);
 		}
 	}
 

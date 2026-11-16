@@ -78,11 +78,16 @@ export class WeekPlanBot {
 		if (!messageId) return;
 
 		const events = await withPlans(await getWeekEvents(weekStart));
-		await this.bot.api.editMessageText(
-			BOT_HOME_GROUP_CHAT_ID,
-			messageId,
-			this.buildWeekMessage(weekStart, events)
-		);
+		try {
+			await this.bot.api.editMessageText(
+				BOT_HOME_GROUP_CHAT_ID,
+				messageId,
+				this.buildWeekMessage(weekStart, events)
+			);
+		} catch (error) {
+			// two updates within the same second render the same text (the footer has the time); Telegram answers 400
+			if (!(error instanceof GrammyError) || !/message is not modified/i.test(error.description)) throw error;
+		}
 	}
 
 	/** after a sign-up change: refresh the week plan and the agenda of that day */
