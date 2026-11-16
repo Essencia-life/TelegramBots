@@ -8,10 +8,6 @@ export const GET: RequestHandler = async () => {
 	try {
 		await agendaBot.sendAgenda();
 	} catch (err) {
-		if (err instanceof Error && err.message === 'Missing configuration') {
-			return error(412, err.message);
-		}
-
 		console.error(err);
 		return error(500);
 	}
@@ -30,10 +26,6 @@ export const POST: RequestHandler = async ({ request: { headers } }) => {
 		try {
 			await agendaBot.updateAgenda(DateTime.fromISO(date).setZone(timeZone), messageId);
 		} catch (err) {
-			if (err instanceof Error && err.message === 'Missing configuration') {
-				return error(412, err.message);
-			}
-
 			console.error(err);
 			return error(500);
 		}

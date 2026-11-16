@@ -5,10 +5,6 @@ export const GET: RequestHandler = async ({ url }) => {
 	try {
 		await weekPlanBot.sendWeekPlan(!url.searchParams.has('currentWeek'));
 	} catch (err) {
-		if (err instanceof Error && err.message === 'Missing configuration') {
-			return error(412, err.message);
-		}
-
 		console.error(err);
 		return error(500);
 	}
