@@ -47,7 +47,8 @@ export class Calendar {
 	async getEvent(eventId: string) {
 		try {
 			const res = await calendar.events.get({
-				fields: 'description,start,end,iCalUID',
+				// extendedProperties: the inline message id (private) and the privacy flag (shared) are read from it
+				fields: 'summary,description,start,end,iCalUID,extendedProperties',
 				calendarId: this.calendarId,
 				eventId
 			});
