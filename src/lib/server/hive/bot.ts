@@ -5,7 +5,7 @@ import {
 	CO_WORKING_CALENDAR_ID,
 	VERCEL_ENV
 } from '$env/static/private';
-import { Bot, InlineKeyboard, InlineQueryResultBuilder } from 'grammy';
+import { Bot, GrammyError, InlineKeyboard, InlineQueryResultBuilder } from 'grammy';
 import { Calendar, type CalendarEvent } from '../calendar';
 import { generateAgenda } from './agenda';
 import { redis } from '$lib/server/redis';
@@ -124,7 +124,7 @@ export async function updateInlineMessage(
 	}
 }
 
-// TODO remove in favor of webhook via calendar.events.watch
+/** Called after a booking changed. The calendar watch (see the agenda route) covers the delayed resource calendar. */
 export async function updateAgenda(event: CalendarEvent) {
 	const today = new Date();
 	const start = new Date(event.start!.dateTime!);
@@ -134,25 +134,32 @@ export async function updateAgenda(event: CalendarEvent) {
 		today.getMonth() === start.getMonth() &&
 		today.getFullYear() === start.getFullYear()
 	) {
-		const messageId = await redis.get<number>(`essencia:${VERCEL_ENV}:hiveBotAgendaMessageId`);
+		await refreshAgenda();
+	}
+}
 
-		console.log(messageId);
+/** Renders today's agenda message again from the Hive calendar. */
+export async function refreshAgenda() {
+	const messageId = await redis.get<number>(`essencia:${VERCEL_ENV}:hiveBotAgendaMessageId`);
 
-		if (!messageId) {
-			return;
-		}
+	if (!messageId) {
+		return;
+	}
 
-		const text = await generateAgenda();
+	const text = await generateAgenda();
 
-		if (text) {
-			// FIXME message not updated - probably the resource calendar is delayed
-			return bot.api.editMessageText(BOT_HOME_GROUP_CHAT_ID, messageId, text, {
-				parse_mode: 'HTML',
-				reply_markup: new InlineKeyboard().add(await getInlineKeyboardOpenBookingsButton())
-			});
-		}
-
+	if (!text) {
 		return bot.api.deleteMessage(BOT_HOME_GROUP_CHAT_ID, messageId);
+	}
+
+	try {
+		await bot.api.editMessageText(BOT_HOME_GROUP_CHAT_ID, messageId, text, {
+			parse_mode: 'HTML',
+			reply_markup: new InlineKeyboard().add(await getInlineKeyboardOpenBookingsButton())
+		});
+	} catch (err) {
+		// the resource calendar is delayed, so the text can still be the same as before: Telegram answers 400
+		if (!(err instanceof GrammyError) || !/message is not modified/i.test(err.description)) throw err;
 	}
 }
 

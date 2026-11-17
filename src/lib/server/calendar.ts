@@ -12,6 +12,7 @@ const auth = new google.auth.JWT({
 
 export type CalendarEvent = calendar_v3.Schema$Event;
 export type TimePeriod = calendar_v3.Schema$TimePeriod;
+export type CalendarChannel = calendar_v3.Schema$Channel;
 
 const calendar = google.calendar({ version: 'v3', auth });
 
@@ -98,6 +99,19 @@ export class Calendar {
 		});
 
 		return busyPeriods(res.data.items ?? [], this.calendarId, excludeICalUID);
+	}
+
+	/** Google calls the channel's webhook when an event in the range changes. */
+	async watchEvents(start: Date, end: Date, requestBody: CalendarChannel) {
+		return calendar.events.watch({
+			calendarId: this.calendarId,
+			singleEvents: true,
+			orderBy: 'startTime',
+			timeMin: start.toISOString(),
+			timeMax: end.toISOString(),
+			timeZone: 'Europe/Lisbon',
+			requestBody
+		});
 	}
 
 	async getFreeBusy(start: string, end: string): Promise<TimePeriod[]> {

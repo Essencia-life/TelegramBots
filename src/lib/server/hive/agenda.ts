@@ -3,7 +3,7 @@ import { HIVE_CALENDAR_ID } from '$env/static/private';
 
 const hiveCalendar = new Calendar(HIVE_CALENDAR_ID);
 
-function buildIsoRangeForToday() {
+export function buildIsoRangeForToday() {
 	const now = new Date();
 	const lisbonTime = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Lisbon' }));
 
