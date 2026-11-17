@@ -163,114 +163,119 @@
 	});
 </script>
 
-<header class="sticky top-0 z-10 mb-6 flex h-16 items-center justify-between bg-surface">
-	<Button outline class="border-0 p-2!" onclick={prevDay}>
-		<ChevronLeft />
-	</Button>
-	<label class="relative">
-		<input
-			type="date"
-			value={params.date}
-			class="absolute inset-0"
-			bind:this={dateInput}
-			oninput={(event) =>
-				goto(
-					resolve('/hive/webapp/[date=date]', {
-						date: event.currentTarget.value as `${number}-${number}-${number}`
-					}),
-					{
-						replaceState: true,
-						noScroll: true
-					}
-				)}
-		/>
-		<Button
-			outline
-			class="relative rounded-none border-0 bg-surface!"
-			onclick={() => dateInput.showPicker()}
-		>
-			<h2 class="font-medium tracking-wide whitespace-nowrap">
-				{startOfDay
-					.toLocaleDateString('en-gb', {
-						day: '2-digit',
-						month: '2-digit',
-						year: '2-digit',
-						weekday: 'long'
-					})
-					.replaceAll('/', '.')}
-			</h2>
+<!-- sticky holds within its parent only: the body is as high as the screen, so the calendar gets its own parent -->
+<div>
+	<header
+		class="sticky top-0 z-10 mb-6 flex h-16 items-center justify-between bg-surface dark:bg-gray-900"
+	>
+		<Button outline class="border-0 p-2!" onclick={prevDay}>
+			<ChevronLeft />
 		</Button>
-	</label>
-	<Button outline class="border-0 p-2!" onclick={nextDay}>
-		<ChevronRight />
-	</Button>
-</header>
+		<label class="relative">
+			<input
+				type="date"
+				value={params.date}
+				class="absolute inset-0"
+				bind:this={dateInput}
+				oninput={(event) =>
+					goto(
+						resolve('/hive/webapp/[date=date]', {
+							date: event.currentTarget.value as `${number}-${number}-${number}`
+						}),
+						{
+							replaceState: true,
+							noScroll: true
+						}
+					)}
+			/>
+			<Button
+				outline
+				class="relative rounded-none border-0 bg-surface! dark:bg-gray-900!"
+				onclick={() => dateInput.showPicker()}
+			>
+				<h2 class="font-medium tracking-wide whitespace-nowrap">
+					{startOfDay
+						.toLocaleDateString('en-gb', {
+							day: '2-digit',
+							month: '2-digit',
+							year: '2-digit',
+							weekday: 'long'
+						})
+						.replaceAll('/', '.')}
+				</h2>
+			</Button>
+		</label>
+		<Button outline class="border-0 p-2!" onclick={nextDay}>
+			<ChevronRight />
+		</Button>
+	</header>
 
-<main
-	class="calendar touch-pan-y"
-	{@attach swipe({ threshold: 100, left: nextDay, right: prevDay })}
->
-	<div class="column col-1! row-start-4! -row-end-1! text-sm text-gray-700">
-		{#each hours as hour (hour)}
-			<div class="row-span-4">
-				<time>{timeFormatter.format(new Date(startOfDay).setHours(hour))}</time>
-			</div>
-		{/each}
-	</div>
-	<div class="column">
-		{#each Array(24) as _, hour (hour)}
-			<div class="row-span-4 grid grid-rows-4 rounded-lg bg-white">
-				{#each Array(4) as _, quarter (quarter)}
-					{@const time = timeFormatter.format(new Date(startOfDay).setHours(hour, quarter * 15))}
-					<a
-						class="relative z-1"
-						aria-label={time}
-						data-sveltekit-noscroll
-						href={resolve('/hive/webapp/[date=date]/booking', {
-							date: params.date
-						}) +
-							'?start=' +
-							time}
-					></a>
-				{/each}
-			</div>
-		{/each}
-	</div>
-	{#if ready}
-		<div class="column">
-			{#each await getBookings(params.date) as booking (booking.id)}
-				{@const isOwn =
-					booking.extendedProperties?.shared?.telegramUserId === WebApp.initDataUnsafe.user?.id.toString()}
-
-				<svelte:element
-					this={isOwn ? 'a' : 'div'}
-					class="booking z-2 flex flex-col rounded-lg bg-accent p-2! text-white"
-					class:small={isShortBooking(booking.start!.dateTime!, booking.end!.dateTime!)}
-					class:past={isPast(booking.end!.dateTime!)}
-					style:grid-row={timeToRows(booking.start!.dateTime!, booking.end!.dateTime!)}
-					data-sveltekit-noscroll
-					href={isOwn
-						? resolve('/hive/webapp/[date=date]/booking/[[id]]', {
-								date: params.date,
-								id: booking.id!
-							})
-						: undefined}
-				>
-					<b>{booking.summary}</b>
-					<div class="overflow-hidden leading-6">{booking.description}</div>
-				</svelte:element>
+	<main
+		class="calendar touch-pan-y"
+		{@attach swipe({ threshold: 100, left: nextDay, right: prevDay })}
+	>
+		<div class="column col-1! row-start-4! -row-end-1! text-sm text-gray-700 dark:text-gray-400">
+			{#each hours as hour (hour)}
+				<div class="row-span-4">
+					<time>{timeFormatter.format(new Date(startOfDay).setHours(hour))}</time>
+				</div>
 			{/each}
-
-			{#if startOfDay.getTime() < now.getTime() && now.getTime() < endOfDay.getTime()}
-				<div
-					class="now pointer-events-none absolute inset-x-0 border-t-2 border-amber"
-					style:--now={percent(now)}
-					{@attach scrollIntoView}
-				></div>
-			{/if}
 		</div>
-	{/if}
-</main>
+		<div class="column">
+			{#each Array(24) as _, hour (hour)}
+				<div class="row-span-4 grid grid-rows-4 rounded-lg bg-white dark:bg-gray-800">
+					{#each Array(4) as _, quarter (quarter)}
+						{@const time = timeFormatter.format(new Date(startOfDay).setHours(hour, quarter * 15))}
+						<a
+							class="relative z-1"
+							aria-label={time}
+							data-sveltekit-noscroll
+							href={resolve('/hive/webapp/[date=date]/booking', {
+								date: params.date
+							}) +
+								'?start=' +
+								time}
+						></a>
+					{/each}
+				</div>
+			{/each}
+		</div>
+		{#if ready}
+			<div class="column">
+				{#each await getBookings(params.date) as booking (booking.id)}
+					{@const isOwn =
+						booking.extendedProperties?.shared?.telegramUserId === WebApp.initDataUnsafe.user?.id.toString()}
+
+					<svelte:element
+						this={isOwn ? 'a' : 'div'}
+						class="booking z-2 flex flex-col rounded-lg bg-accent p-2! text-white"
+						class:small={isShortBooking(booking.start!.dateTime!, booking.end!.dateTime!)}
+						class:past={isPast(booking.end!.dateTime!)}
+						style:grid-row={timeToRows(booking.start!.dateTime!, booking.end!.dateTime!)}
+						data-sveltekit-noscroll
+						href={isOwn
+							? resolve('/hive/webapp/[date=date]/booking/[[id]]', {
+									date: params.date,
+									id: booking.id!
+								})
+							: undefined}
+					>
+						<b>{booking.summary}</b>
+						<div class="overflow-hidden leading-6">{booking.description}</div>
+					</svelte:element>
+				{/each}
+
+				{#if startOfDay.getTime() < now.getTime() && now.getTime() < endOfDay.getTime()}
+					<div
+						class="now pointer-events-none absolute inset-x-0 border-t-2 border-amber"
+						style:--now={percent(now)}
+						{@attach scrollIntoView}
+					></div>
+				{/if}
+			</div>
+		{/if}
+	</main>
+</div>
 
 <Button
 	pill
