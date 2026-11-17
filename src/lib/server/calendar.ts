@@ -15,6 +15,18 @@ export type TimePeriod = calendar_v3.Schema$TimePeriod;
 
 const calendar = google.calendar({ version: 'v3', auth });
 
+/**
+ * Busy times of a resource calendar from its events, without the booking that is being edited
+ * (the resource's copy of an event has the same iCalUID as the organizer's event).
+ */
+export function busyPeriods(events: CalendarEvent[], resourceId: string, excludeICalUID?: string | null): TimePeriod[] {
+	return events
+		.filter((e) => e.status !== 'cancelled' && e.transparency !== 'transparent')
+		.filter((e) => !excludeICalUID || e.iCalUID !== excludeICalUID)
+		.filter((e) => !e.attendees?.some((a) => a.email === resourceId && a.responseStatus === 'declined'))
+		.map((e) => ({ start: e.start?.dateTime ?? e.start?.date, end: e.end?.dateTime ?? e.end?.date }));
+}
+
 export class Calendar {
 	constructor(private readonly calendarId: string) {}
 
@@ -35,7 +47,7 @@ export class Calendar {
 	async getEvent(eventId: string) {
 		try {
 			const res = await calendar.events.get({
-				fields: 'description,start,end',
+				fields: 'description,start,end,iCalUID',
 				calendarId: this.calendarId,
 				eventId
 			});
@@ -71,6 +83,20 @@ export class Calendar {
 			calendarId: this.calendarId,
 			eventId
 		});
+	}
+
+	/** Like getFreeBusy, but a booking can be left out (to check an edit against the other bookings). */
+	async getBusyExcept(start: string, end: string, excludeICalUID?: string | null): Promise<TimePeriod[]> {
+		const res = await calendar.events.list({
+			calendarId: this.calendarId,
+			singleEvents: true,
+			timeMin: start,
+			timeMax: end,
+			timeZone: 'Europe/Lisbon',
+			fields: 'items(iCalUID,status,transparency,start,end,attendees(email,responseStatus))'
+		});
+
+		return busyPeriods(res.data.items ?? [], this.calendarId, excludeICalUID);
 	}
 
 	async getFreeBusy(start: string, end: string): Promise<TimePeriod[]> {
