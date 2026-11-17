@@ -85,7 +85,7 @@
 			new Date(`${date}T${endTime}:00`).toLocaleString('en-US', { timeZone: 'Europe/Lisbon' })
 		).toISOString();
 
-		const busy = await checkAvailability({ startDate, endDate });
+		const busy = await checkAvailability({ startDate, endDate, excludeId: params.id });
 
 		if (busy.length > 0) {
 			loading = false;

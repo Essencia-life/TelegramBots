@@ -19,11 +19,16 @@ export const getBookings = query(z.iso.date(), async (date) => {
 export const checkAvailability = command(
 	z.object({
 		startDate: z.iso.datetime(),
-		endDate: z.iso.datetime()
+		endDate: z.iso.datetime(),
+		/** the booking being edited: it must not block itself */
+		excludeId: z.string().optional()
 	}),
-	async ({ startDate, endDate }) => {
+	async ({ startDate, endDate, excludeId }) => {
 		const hiveCalendar = new Calendar(HIVE_CALENDAR_ID);
-		return hiveCalendar.getFreeBusy(startDate, endDate);
+		if (!excludeId) return hiveCalendar.getFreeBusy(startDate, endDate);
+
+		const own = await new Calendar(CO_WORKING_CALENDAR_ID).getEvent(excludeId);
+		return hiveCalendar.getBusyExcept(startDate, endDate, own?.iCalUID);
 	}
 );
 
