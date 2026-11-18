@@ -8,7 +8,7 @@ export type VisitorType = 'guest' | 'volunteer';
 export const visitorTags: Record<VisitorType, string> = { guest: 'Guest', volunteer: 'Volunteer' };
 
 const timeZone = 'Europe/Lisbon';
-const key = (link: string) => `essencia:${VERCEL_ENV}:telegram:invite:${link}`;
+const key = (link: string) => `orgaBot:${VERCEL_ENV}:invite:${link.replace('https://t.me/', '')}`;
 
 /** Unix seconds of the end of the given day (YYYY-MM-DD) in Lisbon. */
 export const endOfDay = (date: string) =>
