@@ -7,7 +7,7 @@ import { endOfDay, saveInvite, visitorTags } from '$lib/server/orga/invites';
 
 const query = z.object({
 	name: z.string().trim().min(1).max(32), // Telegram limit for invite link names
-	departure: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+	departure: z.iso.date(),
 	type: z.enum(['guest', 'volunteer'])
 });
 
@@ -29,9 +29,8 @@ export const GET: RequestHandler = async ({ request, url }) => {
 	const { name, departure, type } = parsed.data;
 
 	const expire_date = endOfDay(departure);
-	// also rejects NaN from impossible dates like 2026-13-45
-	if (!(expire_date > Date.now() / 1000)) {
-		return error(400, 'departure must be a valid date, not in the past');
+	if (expire_date <= Date.now() / 1000) {
+		return error(400, 'departure must not be in the past');
 	}
 
 	try {
