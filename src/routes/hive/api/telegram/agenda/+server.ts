@@ -1,12 +1,17 @@
 import type { RequestHandler } from './$types';
-import { bot, getInlineKeyboardOpenBookingsButton, refreshAgenda } from '$lib/server/hive/bot';
+import {
+	agendaMessageKey,
+	bot,
+	getInlineKeyboardOpenBookingsButton,
+	refreshAgenda
+} from '$lib/server/hive/bot';
 import { InlineKeyboard } from 'grammy';
+import { DateTime } from 'luxon';
 import {
 	BOT_HOME_GROUP_CHAT_ID,
 	HIVE_BOT_TOPIC_ID,
 	HIVE_CALENDAR_ID,
-	VERCEL_BRANCH_URL,
-	VERCEL_ENV
+	VERCEL_BRANCH_URL
 } from '$env/static/private';
 import { Calendar } from '$lib/server/calendar';
 import { redis } from '$lib/server/redis';
@@ -34,8 +39,9 @@ export const GET: RequestHandler = async () => {
 		reply_markup: new InlineKeyboard().add(await getInlineKeyboardOpenBookingsButton())
 	});
 
-	await redis.set(`essencia:${VERCEL_ENV}:hiveBotAgendaMessageId`, message.message_id, {
-		exat: new Date().setHours(23, 59, 59, 999)
+	await redis.set(agendaMessageKey, message.message_id, {
+		// exat takes unix seconds (the old setHours() value was milliseconds, so it never expired)
+		exat: Math.floor(DateTime.now().setZone('Europe/Lisbon').endOf('day').toSeconds())
 	});
 
 	// bookings of today show up in the agenda when the calendar changes, also when the resource calendar is late
