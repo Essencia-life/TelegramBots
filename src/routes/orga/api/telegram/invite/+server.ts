@@ -1,7 +1,7 @@
 import { error, json, type RequestHandler } from '@sveltejs/kit';
 import { timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
-import { BOT_HOME_GROUP_CHAT_ID, ORGA_INVITE_SECRET_TOKEN } from '$env/static/private';
+import { BOT_HOME_GROUP_CHAT_ID, ORGA_BOT_INVITE_SECRET_TOKEN } from '$env/static/private';
 import { bot } from '$lib/server/orga/bot';
 import { endOfDay, saveInvite, visitorTags } from '$lib/server/orga/invites';
 
@@ -13,12 +13,12 @@ const query = z.object({
 
 function validToken(token: string | null) {
 	const a = Buffer.from(token ?? '');
-	const b = Buffer.from(ORGA_INVITE_SECRET_TOKEN);
+	const b = Buffer.from(ORGA_BOT_INVITE_SECRET_TOKEN);
 	return a.length === b.length && timingSafeEqual(a, b);
 }
 
 export const GET: RequestHandler = async ({ request, url }) => {
-	if (!ORGA_INVITE_SECRET_TOKEN || !validToken(request.headers.get('x-secret-token'))) {
+	if (!ORGA_BOT_INVITE_SECRET_TOKEN || !validToken(request.headers.get('x-secret-token'))) {
 		return error(401);
 	}
 
