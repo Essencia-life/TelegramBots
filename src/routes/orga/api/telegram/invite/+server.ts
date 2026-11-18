@@ -39,7 +39,7 @@ export const GET: RequestHandler = async ({ request, url }) => {
 			expire_date,
 			member_limit: 1
 		});
-		await saveInvite(invite_link, { memberTag: visitorTags[type], expire_date });
+		await saveInvite(invite_link, { tag: visitorTags[type], expire_date });
 		return json({ invite_link });
 	} catch (err) {
 		console.error(err);

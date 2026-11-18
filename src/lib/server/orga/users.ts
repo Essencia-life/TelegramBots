@@ -7,7 +7,7 @@ export interface TelegramUser {
 	last_name?: string;
 	username?: string;
 	/** Telegram member tag shown in the chat */
-	memberTag?: string;
+	tag?: string;
 	/** Unix seconds. The user is removed from the chat shortly after; unset/null keeps them forever. */
 	expire_date?: number | null;
 }
@@ -25,11 +25,11 @@ class Users {
 		return users.map((u) => u?.[0]).filter(Boolean);
 	}
 
-	async addUser({ id, first_name, last_name, username, memberTag, expire_date }: TelegramUser) {
+	async addUser({ id, first_name, last_name, username, tag, expire_date }: TelegramUser) {
 		return redis.json.set(
 			storageKeyPrefix + id,
 			'$',
-			JSON.stringify({ id, first_name, last_name, username, memberTag, expire_date })
+			JSON.stringify({ id, first_name, last_name, username, tag, expire_date })
 		);
 	}
 

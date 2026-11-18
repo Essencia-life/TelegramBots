@@ -19,7 +19,7 @@ export function endOfDay(date: string): number {
 
 /** What a user inherits when joining via the invite link. */
 export interface Invite {
-	memberTag: string;
+	tag: string;
 	expire_date: number;
 }
 

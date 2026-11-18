@@ -27,7 +27,7 @@ export class UsersBot {
 
 		try {
 			// Needs the admin right can_manage_tags.
-			await this.bot.api.setChatMemberTag(BOT_HOME_GROUP_CHAT_ID, user.id!, invite.memberTag);
+			await this.bot.api.setChatMemberTag(BOT_HOME_GROUP_CHAT_ID, user.id!, invite.tag);
 		} catch (err) {
 			console.error('Failed to tag invited member', err);
 		}
