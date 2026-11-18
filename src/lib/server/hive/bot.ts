@@ -138,9 +138,11 @@ export async function updateAgenda(event: CalendarEvent) {
 	}
 }
 
+export const agendaMessageKey = `hiveBot:${VERCEL_ENV}:agendaMessageId`;
+
 /** Renders today's agenda message again from the Hive calendar. */
 export async function refreshAgenda() {
-	const messageId = await redis.get<number>(`essencia:${VERCEL_ENV}:hiveBotAgendaMessageId`);
+	const messageId = await redis.get<number>(agendaMessageKey);
 
 	if (!messageId) {
 		return;
