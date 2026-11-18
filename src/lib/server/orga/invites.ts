@@ -1,3 +1,4 @@
+import { DateTime } from 'luxon';
 import { redis } from '$lib/server/redis';
 import { VERCEL_ENV } from '$env/static/private';
 
@@ -10,12 +11,8 @@ const timeZone = 'Europe/Lisbon';
 const key = (link: string) => `essencia:${VERCEL_ENV}:telegram:invite:${link}`;
 
 /** Unix seconds of the end of the given day (YYYY-MM-DD) in Lisbon. */
-export function endOfDay(date: string): number {
-	const utc = Date.parse(`${date}T23:59:59Z`);
-	// Offset of Lisbon at that moment, derived by formatting the UTC instant in Lisbon.
-	const lisbon = new Date(utc).toLocaleString('sv-SE', { timeZone }).replace(' ', 'T') + 'Z';
-	return Math.floor((utc - (Date.parse(lisbon) - utc)) / 1000);
-}
+export const endOfDay = (date: string) =>
+	Math.floor(DateTime.fromISO(date, { zone: timeZone }).endOf('day').toSeconds());
 
 /** What a user inherits when joining via the invite link. */
 export interface Invite {

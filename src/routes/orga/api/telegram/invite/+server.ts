@@ -29,8 +29,9 @@ export const GET: RequestHandler = async ({ request, url }) => {
 	const { name, departure, type } = parsed.data;
 
 	const expire_date = endOfDay(departure);
-	if (expire_date <= Date.now() / 1000) {
-		return error(400, 'departure must not be in the past');
+	// also rejects NaN from impossible dates like 2026-13-45
+	if (!(expire_date > Date.now() / 1000)) {
+		return error(400, 'departure must be a valid date, not in the past');
 	}
 
 	try {
