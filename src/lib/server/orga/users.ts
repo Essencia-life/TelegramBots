@@ -6,6 +6,10 @@ export interface TelegramUser {
 	first_name: string;
 	last_name?: string;
 	username?: string;
+	/** Telegram member tag shown in the chat */
+	tag?: string;
+	/** Unix seconds. The user is removed from the chat shortly after; unset/null keeps them forever. */
+	expire_date?: number | null;
 }
 
 export const storageKeyPrefix = `essencia:${VERCEL_ENV}:telegram:user:`;
@@ -21,11 +25,11 @@ class Users {
 		return users.map((u) => u?.[0]).filter(Boolean);
 	}
 
-	async addUser({ id, first_name, last_name, username }: TelegramUser) {
+	async addUser({ id, first_name, last_name, username, tag, expire_date }: TelegramUser) {
 		return redis.json.set(
 			storageKeyPrefix + id,
 			'$',
-			JSON.stringify({ id, first_name, last_name, username })
+			JSON.stringify({ id, first_name, last_name, username, tag, expire_date })
 		);
 	}
 
