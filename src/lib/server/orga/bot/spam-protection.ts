@@ -22,7 +22,7 @@ export class SpamProtectionBot {
 					ctx.message.message_thread_id,
 					{
 						nx: true,
-						ex: ms('4h')
+						px: ms('4h')
 					}
 				);
 
