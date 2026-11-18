@@ -3,8 +3,6 @@ import users from '../users';
 import { takeInvite, visitorTags } from '../invites';
 import { BOT_HOME_GROUP_CHAT_ID } from '$env/static/private';
 
-type Raw = { setChatMemberTag(params: object): Promise<unknown> };
-
 export class UsersBot {
 	constructor(private bot: Bot) {
 		bot.on('chat_member', async (ctx) => {
@@ -28,12 +26,8 @@ export class UsersBot {
 		try {
 			const type = await takeInvite(link);
 			if (!type) return;
-			// Bot API 9.5; not in the typings of the locked grammY version. Needs admin right can_manage_tags.
-			await (this.bot.api.raw as unknown as Raw).setChatMemberTag({
-				chat_id: BOT_HOME_GROUP_CHAT_ID,
-				user_id: userId,
-				tag: visitorTags[type]
-			});
+			// Needs the admin right can_manage_tags.
+			await this.bot.api.setChatMemberTag(BOT_HOME_GROUP_CHAT_ID, userId, visitorTags[type]);
 		} catch (err) {
 			console.error('Failed to tag invited member', err);
 		}
