@@ -1,4 +1,5 @@
 import { redis } from '$lib/server/redis';
+import { VERCEL_ENV } from '$env/static/private';
 import type { TelegramUser } from './users';
 
 /**
@@ -15,6 +16,8 @@ export interface JobPlan {
 export type Plan = Record<string, JobPlan>;
 
 const planKey = (type: string, date: string) => `essencia:orga:plan:${type}:${date}`;
+const messageKey = (kind: 'week' | 'agenda', date: string) =>
+	`orgaBot:${VERCEL_ENV}:${kind}msg:${date}`;
 const TTL = 60 * 24 * 3600;
 
 // Returns 1 = signed up, 2 = was already signed up, 0 = job is full
@@ -81,6 +84,6 @@ export async function getPlan(type: string, date: string): Promise<Plan> {
 
 // message ids, to edit the posts after a sign-up (the calendar no longer changes when people sign up)
 export const setMessageId = (kind: 'week' | 'agenda', date: string, id: number) =>
-	redis.set(`essencia:orga:${kind}msg:${date}`, id, { ex: TTL });
+	redis.set(messageKey(kind, date), id, { ex: TTL });
 export const getMessageId = (kind: 'week' | 'agenda', date: string) =>
-	redis.get<number>(`essencia:orga:${kind}msg:${date}`);
+	redis.get<number>(messageKey(kind, date));
