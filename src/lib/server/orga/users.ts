@@ -12,11 +12,37 @@ export interface TelegramUser {
 	expire_date?: number | null;
 }
 
-export const storageKeyPrefix = `essencia:${VERCEL_ENV}:telegram:user:`;
+export const storageKeyPrefix = `orgaBot:${VERCEL_ENV}:member:`;
+const legacyKeyPrefix = `essencia:${VERCEL_ENV}:telegram:user:`;
 
 class Users {
+	private migration?: Promise<void>;
+
+	/**
+	 * Moves users from the legacy key prefix on first use of this instance. Safe to run
+	 * concurrently and repeatedly. Remove together with legacyKeyPrefix once every environment has run it.
+	 */
+	private migrate() {
+		this.migration ??= this.moveLegacyKeys().catch((err) => {
+			this.migration = undefined; // try again on the next call
+			console.error('User key migration failed', err);
+		});
+		return this.migration;
+	}
+
+	private async moveLegacyKeys() {
+		for (const key of await this.scan(legacyKeyPrefix)) {
+			const newKey = storageKeyPrefix + key.slice(legacyKeyPrefix.length);
+			// RENAMENX does not overwrite: a user that already exists under the new key is newer
+			if ((await redis.renamenx(key, newKey)) === 0) {
+				await redis.del(key);
+			}
+		}
+	}
+
 	async getAll() {
-		const keys = await this.getAllKeys();
+		await this.migrate();
+		const keys = await this.scan(storageKeyPrefix);
 		if (keys.length === 0) {
 			return [];
 		}
@@ -26,6 +52,7 @@ class Users {
 	}
 
 	async addUser({ id, first_name, last_name, username, tag, expire_date }: TelegramUser) {
+		await this.migrate();
 		return redis.json.set(
 			storageKeyPrefix + id,
 			'$',
@@ -34,16 +61,17 @@ class Users {
 	}
 
 	async removeUser({ id }: TelegramUser) {
+		await this.migrate();
 		return redis.json.del(storageKeyPrefix + id);
 	}
 
-	private async getAllKeys() {
+	private async scan(prefix: string) {
 		let cursor = 0;
 		const keys: string[] = [];
 
 		do {
 			const [nextCursor, batch] = await redis.scan(cursor, {
-				match: storageKeyPrefix + '*',
+				match: prefix + '*',
 				count: 500
 			});
 
