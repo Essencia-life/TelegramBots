@@ -31,15 +31,22 @@ export function busyPeriods(events: CalendarEvent[], resourceId: string, exclude
 export class Calendar {
 	constructor(private readonly calendarId: string) {}
 
-	async getEvents(filter: string[], start?: Date, end?: Date): Promise<CalendarEvent[]> {
+	/** `props` selects which extended properties `filter` matches against. */
+	async getEvents(
+		filter: string[],
+		start?: Date,
+		end?: Date,
+		{ props = 'shared' }: { props?: 'shared' | 'private' } = {}
+	): Promise<CalendarEvent[]> {
 		const res = await calendar.events.list({
 			calendarId: this.calendarId,
 			singleEvents: true,
 			orderBy: 'startTime',
 			timeMin: start?.toISOString(),
 			timeMax: end?.toISOString(),
-			sharedExtendedProperty: filter,
-			fields: 'items(id,summary,description,start,end,extendedProperties)'
+			timeZone: 'Europe/Lisbon',
+			...(props === 'private' ? { privateExtendedProperty: filter } : { sharedExtendedProperty: filter }),
+			fields: 'items(id,summary,description,location,start,end,recurringEventId,iCalUID,extendedProperties)'
 		});
 
 		return res.data.items ?? [];

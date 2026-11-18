@@ -72,7 +72,7 @@ export class AgendaBot {
 		const endOfDay = date.endOf('day').toJSDate();
 
 		const eventsPerCalendar = await Promise.all(
-			Object.values(calendarByName).map((calendar) => calendar.getEvents([], startOfDay, endOfDay))
+			Object.values(calendarByName).map((calendar) => calendar.getEvents([], startOfDay, endOfDay, { props: 'private' }))
 		);
 
 		return eventsPerCalendar.flat().sort(byStartDate);

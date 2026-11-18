@@ -6,7 +6,7 @@ import type {
 	RichMessageButton
 } from 'grammy/types';
 import { DateTime } from 'luxon';
-import type { CalendarEvent } from '../calendar';
+import type { CalendarEvent } from '$lib/server/calendar';
 import {
 	calendarByName,
 	dateKey,

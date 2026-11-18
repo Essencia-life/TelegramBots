@@ -1,4 +1,4 @@
-import { Calendar, type CalendarEvent } from './calendar';
+import { Calendar, type CalendarEvent } from '$lib/server/calendar';
 import { DateTime } from 'luxon';
 import { COMMUNITY_CALENDAR_ID, EVENTS_CALENDAR_ID } from '$env/static/private';
 import { parseJobs, typeSchema, type Job } from './jobs';
@@ -37,7 +37,7 @@ export function toPlanEvent(event: CalendarEvent): PlanEvent | null {
 /** Events with jobs between two instants; the calendar can not filter on "has a jobs property". */
 async function getPlanEvents(filter: string[], start: Date, end: Date) {
 	const perCalendar = await Promise.all(
-		Object.values(calendarByName).map((calendar) => calendar.getEvents(filter, start, end))
+		Object.values(calendarByName).map((calendar) => calendar.getEvents(filter, start, end, { props: 'private' }))
 	);
 	return perCalendar.flat().flatMap((event) => toPlanEvent(event) ?? []);
 }
