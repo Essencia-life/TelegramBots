@@ -3,7 +3,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import { BOT_HOME_GROUP_CHAT_ID, ORGA_INVITE_SECRET_TOKEN } from '$env/static/private';
 import { bot } from '$lib/server/orga/bot';
-import { endOfDay, saveInvite } from '$lib/server/orga/invites';
+import { endOfDay, saveInvite, visitorTags } from '$lib/server/orga/invites';
 
 const query = z.object({
 	name: z.string().trim().min(1).max(32), // Telegram limit for invite link names
@@ -39,7 +39,7 @@ export const GET: RequestHandler = async ({ request, url }) => {
 			expire_date,
 			member_limit: 1
 		});
-		await saveInvite(invite_link, type, expire_date);
+		await saveInvite(invite_link, { memberTag: visitorTags[type], expire_date });
 		return json({ invite_link });
 	} catch (err) {
 		console.error(err);

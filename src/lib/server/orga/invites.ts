@@ -17,10 +17,16 @@ export function endOfDay(date: string): number {
 	return Math.floor((utc - (Date.parse(lisbon) - utc)) / 1000);
 }
 
-export async function saveInvite(link: string, type: VisitorType, expireDate: number) {
-	await redis.set(key(link), type, { exat: expireDate });
+/** What a user inherits when joining via the invite link. */
+export interface Invite {
+	memberTag: string;
+	expire_date: number;
+}
+
+export async function saveInvite(link: string, invite: Invite) {
+	await redis.set(key(link), invite, { exat: invite.expire_date });
 }
 
 export async function takeInvite(link: string) {
-	return redis.getdel<VisitorType>(key(link));
+	return redis.getdel<Invite>(key(link));
 }

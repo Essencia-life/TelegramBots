@@ -14,6 +14,10 @@
 			"schedule": "50 10 * * 6"
 		},
 		{
+			"path": "/orga/api/telegram/expire-users",
+			"schedule": "0 4 * * *"
+		},
+		{
 			"path": "/hive/api/telegram/agenda",
 			"schedule": "0 5 * * *"
 		}

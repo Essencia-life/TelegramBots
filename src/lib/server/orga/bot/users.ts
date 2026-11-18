@@ -1,6 +1,6 @@
 import type { Bot } from 'grammy';
-import users from '../users';
-import { takeInvite, visitorTags } from '../invites';
+import users, { type TelegramUser } from '../users';
+import { takeInvite } from '../invites';
 import { BOT_HOME_GROUP_CHAT_ID } from '$env/static/private';
 
 export class UsersBot {
@@ -12,8 +12,7 @@ export class UsersBot {
 				const member = ctx.chatMember.new_chat_member;
 
 				if (member.status === 'member' && !member.user.is_bot) {
-					await users.addUser(ctx.chatMember.new_chat_member.user);
-					await this.tagVisitor(ctx.chatMember.invite_link?.invite_link, member.user.id);
+					await this.join(member.user, ctx.chatMember.invite_link?.invite_link);
 				} else if (member.status === 'left' || member.status === 'kicked') {
 					await users.removeUser(ctx.chatMember.old_chat_member.user);
 				}
@@ -21,13 +20,14 @@ export class UsersBot {
 		});
 	}
 
-	private async tagVisitor(link: string | undefined, userId: number) {
-		if (!link) return;
+	private async join(user: TelegramUser, link?: string) {
+		const invite = link ? await takeInvite(link) : null;
+		await users.addUser({ ...user, ...invite });
+		if (!invite) return;
+
 		try {
-			const type = await takeInvite(link);
-			if (!type) return;
 			// Needs the admin right can_manage_tags.
-			await this.bot.api.setChatMemberTag(BOT_HOME_GROUP_CHAT_ID, userId, visitorTags[type]);
+			await this.bot.api.setChatMemberTag(BOT_HOME_GROUP_CHAT_ID, user.id!, invite.memberTag);
 		} catch (err) {
 			console.error('Failed to tag invited member', err);
 		}
