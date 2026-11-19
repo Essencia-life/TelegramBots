@@ -299,19 +299,23 @@ export class WeekPlanBot {
 			]
 		});
 
-		const send = (extra: object) =>
+		// Bot API 10.4: a reply to a callback query needs no receiver_user_id; passing it with
+		// message_thread_id ended in REPLY_TO_INVALID.
+		const send = (extra: object, asReply = false) =>
 			this.bot.api.sendRichMessage(
 				BOT_HOME_GROUP_CHAT_ID,
 				{ blocks },
-				{
-					message_thread_id: topics.weeklyJobs,
-					ephemeral_message_parameters: { receiver_user_id: user.id, ...extra }
-				}
+				asReply
+					? { ephemeral_message_parameters: extra }
+					: {
+							message_thread_id: topics.weeklyJobs,
+							ephemeral_message_parameters: { receiver_user_id: user.id, ...extra }
+						}
 			);
 
 		if (replaceCallbackQueryMessage && callbackQueryId) {
 			try {
-				await send({ callback_query_id: callbackQueryId, replace_callback_query_message: true });
+				await send({ callback_query_id: callbackQueryId, replace_callback_query_message: true }, true);
 				return;
 			} catch (error) {
 				if (!(error instanceof GrammyError) || error.error_code !== 400) throw error;
