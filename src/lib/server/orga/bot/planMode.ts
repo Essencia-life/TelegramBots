@@ -60,10 +60,6 @@ export function parseChosen(message: {
 	return null;
 }
 
-/** Shows “typing…” (it fades after 5 seconds) until the returned function is called. */
-export function startTyping(bot: Bot, chatId: number) {
-	const send = () => bot.api.sendChatAction(chatId, 'typing').catch(() => {});
-	void send();
-	const timer = setInterval(send, 4000);
-	return () => clearInterval(timer);
-}
+/** Shows “typing…” for 5 seconds, which is mostly enough for the work around it. */
+export const startTyping = (bot: Bot, chatId: number) =>
+	void bot.api.sendChatAction(chatId, 'typing').catch(() => {});
