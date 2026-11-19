@@ -32,6 +32,7 @@ export function personResult(user: TelegramUser, { type, date, jobKey }: SlotTar
 		title: [user.first_name, user.last_name].join(' ').trim(),
 		description: user.username ? `@${user.username}` : undefined,
 		input_message_content: {
+			link_preview_options: { is_disabled: true },
 			message_text: `${user.first_name} is being assigned ${slotLabel}`,
 			entities: [
 				{
