@@ -110,25 +110,22 @@ export class WeekPlanBot {
 			{
 				type: 'heading',
 				size: 1,
-				text: `${planMode ? '🛠 ' : ''}Week of ${weekStart.toLocaleString({ day: 'numeric' })}–${weekStart
+				text: `${planMode ? '🛠' : '✍️'} Week of ${weekStart.toLocaleString({ day: 'numeric' })}–${weekStart
 					.plus({ days: 6 })
 					.setLocale('en-DE')
 					.toLocaleString({ day: 'numeric', month: 'numeric' })}`
 			},
-			planMode
-				? {
-						type: 'blockquote',
-						blocks: [
-							{
-								type: 'paragraph',
-								text: 'Plan mode: assign people with “Assign person” or remove them with ✖.'
-							}
-						]
-					}
-				: {
+			{
+				type: 'blockquote',
+				blocks: [
+					{
 						type: 'paragraph',
-						text: '✍️ Please sign up for the upcoming week by tapping “I will do it” before Monday morning meeting.'
+						text: planMode
+							? 'Plan mode: assign people with “Assign person” or remove them with ✖.'
+							: 'Please sign up for the upcoming week by tapping “I will do it” before Monday morning meeting.'
 					}
+				]
+			}
 		];
 		const allWeekEvents: PlannedEvent[] = [];
 		const eventsByWeekday = new Map<number, PlannedEvent[]>();
