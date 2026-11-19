@@ -415,6 +415,15 @@ export class WeekPlanBot {
 			if (!match || !(await isChatAdmin(this.bot, ctx.from.id))) return answer([]);
 
 			const { type, date, jobKey, search = '' } = match.groups!;
+			const planEvent = await findPlanEvent(type, date);
+			const job = planEvent?.jobs.find((item) => item.key === jobKey);
+			if (!planEvent || !job) return answer([]);
+
+			const day = parseDate(date)
+				.setLocale('en-DE')
+				.toLocaleString({ weekday: 'long', day: 'numeric', month: 'numeric' });
+			const summary = planEvent.event.summary;
+			const slotLabel = `on ${day} as ${job.title}${summary ? ` (${summary})` : ''}`;
 			const taken = new Set((await store.getPlan(type, date))[jobKey]?.persons.map((p) => p.id));
 			const needle = search.trim().toLowerCase();
 			const candidates = (await users.getAll())
@@ -429,7 +438,7 @@ export class WeekPlanBot {
 			const offset = Number(ctx.inlineQuery.offset) || 0;
 			const page = candidates.slice(offset, offset + 50); // Telegram allows 50 results per answer
 			return answer(
-				page.map((user) => personResult(user, { type, date, jobKey })),
+				page.map((user) => personResult(user, { type, date, jobKey }, slotLabel)),
 				offset + 50 < candidates.length ? String(offset + 50) : ''
 			);
 		});
@@ -439,21 +448,25 @@ export class WeekPlanBot {
 			const chosen = parseChosen(ctx.message);
 			if (!chosen || ctx.message.via_bot?.id !== ctx.me.id) return next();
 
-			await ctx.deleteMessage().catch(() => {});
-			if (ctx.chat.type !== 'private' || !(await isChatAdmin(this.bot, ctx.from.id))) return;
+			try {
+				if (ctx.chat.type !== 'private' || !(await isChatAdmin(this.bot, ctx.from.id))) return;
 
-			const { type, date, jobKey } = chosen.target;
-			const job = (await findPlanEvent(type, date))?.jobs.find((item) => item.key === jobKey);
-			if (!job) return ctx.reply('This job does not exist anymore.');
+				const { type, date, jobKey } = chosen.target;
+				const job = (await findPlanEvent(type, date))?.jobs.find((item) => item.key === jobKey);
+				if (!job) return ctx.reply('This job does not exist anymore.');
 
-			const result = await store.assign(type, date, jobKey, job.slots, {
-				id: chosen.userId,
-				first_name: chosen.firstName
-			});
-			await this.changed(date);
-			await this.refreshPlanMode(ctx.chat.id);
+				const result = await store.assign(type, date, jobKey, job.slots, {
+					id: chosen.userId,
+					first_name: chosen.firstName
+				});
+				await this.changed(date);
+				await this.refreshPlanMode(ctx.chat.id);
 
-			if (result === 'full') return ctx.reply(`“${job.title}” is already full.`);
+				if (result === 'full') return ctx.reply(`“${job.title}” is already full.`);
+			} finally {
+				// stays visible until the plan mode message shows the change
+				await ctx.deleteMessage().catch(() => {});
+			}
 		});
 
 		this.bot.callbackQuery(/^rm:(?<type>[a-z0-9-]+):(?<date>\d{8}):(?<jobKey>[a-z0-9]+):(?<userId>\d+)$/, async (ctx) => {

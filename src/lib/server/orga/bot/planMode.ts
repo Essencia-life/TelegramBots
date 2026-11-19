@@ -24,14 +24,15 @@ export async function isChatAdmin(bot: Bot, userId: number) {
 // slot and the person travel in a hidden link on the first name (the result id is not part of the message).
 const LINK = /^https:\/\/t\.me\/EssenciaOrgaBot\?start=assign_([a-z0-9-]+)_(\d{8})_([a-z0-9]+)_(\d+)$/;
 
-export function personResult(user: TelegramUser, { type, date, jobKey }: SlotTarget) {
+/** `slotLabel` says where the person goes, e.g. "on Monday, 23/11 as Cook (Lunch)" */
+export function personResult(user: TelegramUser, { type, date, jobKey }: SlotTarget, slotLabel: string) {
 	return {
 		type: 'article' as const,
 		id: String(user.id),
 		title: [user.first_name, user.last_name].join(' ').trim(),
 		description: user.username ? `@${user.username}` : undefined,
 		input_message_content: {
-			message_text: user.first_name,
+			message_text: `${user.first_name} is being assigned ${slotLabel}`,
 			entities: [
 				{
 					type: 'text_link' as const,
@@ -44,10 +45,16 @@ export function personResult(user: TelegramUser, { type, date, jobKey }: SlotTar
 	};
 }
 
-export function parseChosen(message: { text: string; entities?: { type: string; url?: string }[] }) {
-	for (const { type: entity, url } of message.entities ?? []) {
+export function parseChosen(message: {
+	text: string;
+	entities?: { type: string; offset: number; length: number; url?: string }[];
+}) {
+	for (const { type: entity, url, offset, length } of message.entities ?? []) {
 		const [, type, date, jobKey, userId] = (entity === 'text_link' && url?.match(LINK)) || [];
-		if (type) return { target: { type, date, jobKey }, userId: Number(userId), firstName: message.text };
+		if (type) {
+			const firstName = message.text.slice(offset, offset + length);
+			return { target: { type, date, jobKey }, userId: Number(userId), firstName };
+		}
 	}
 	return null;
 }
