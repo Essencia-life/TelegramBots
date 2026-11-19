@@ -18,7 +18,7 @@ import {
 import * as store from '../plan-store';
 import type { Plan } from '../plan-store';
 import users, { type TelegramUser } from '../users';
-import { isChatAdmin, parseChosen, personResult, slotPattern } from './planMode';
+import { isChatAdmin, parseChosen, personResult, slotPattern, startTyping } from './planMode';
 import { BOT_HOME_GROUP_CHAT_ID, VERCEL_BRANCH_URL } from '$env/static/private';
 import topics from '../utils/topics';
 
@@ -383,12 +383,17 @@ export class WeekPlanBot {
 
 	/** Week plan with “Assign person” and ✖ buttons for admins, in the private chat with the bot */
 	private async sendPlanMode(chatId: number, weekStart: DateTime) {
-		const events = await withPlans(await getWeekEvents(weekStart));
-		const message = await this.bot.api.sendRichMessage(
-			chatId,
-			this.buildWeekMessage(weekStart, events, true)
-		);
-		await store.setPlanModeMessage(chatId, message.message_id, dateKey(weekStart));
+		const stopTyping = startTyping(this.bot, chatId);
+		try {
+			const events = await withPlans(await getWeekEvents(weekStart));
+			const message = await this.bot.api.sendRichMessage(
+				chatId,
+				this.buildWeekMessage(weekStart, events, true)
+			);
+			await store.setPlanModeMessage(chatId, message.message_id, dateKey(weekStart));
+		} finally {
+			stopTyping();
+		}
 	}
 
 	private async refreshPlanMode(chatId: number) {
@@ -448,6 +453,7 @@ export class WeekPlanBot {
 			const chosen = parseChosen(ctx.message);
 			if (!chosen || ctx.message.via_bot?.id !== ctx.me.id) return next();
 
+			const stopTyping = startTyping(this.bot, ctx.chat.id);
 			try {
 				if (ctx.chat.type !== 'private' || !(await isChatAdmin(this.bot, ctx.from.id))) return;
 
@@ -464,6 +470,7 @@ export class WeekPlanBot {
 
 				if (result === 'full') return ctx.reply(`“${job.title}” is already full.`);
 			} finally {
+				stopTyping();
 				// stays visible until the plan mode message shows the change
 				await ctx.deleteMessage().catch(() => {});
 			}
@@ -475,9 +482,14 @@ export class WeekPlanBot {
 			}
 
 			const { type, date, jobKey, userId } = (ctx.match as RegExpMatchArray).groups!;
-			await store.unassign(type, date, jobKey, { id: Number(userId), first_name: '' });
-			await this.changed(date);
-			await this.refreshPlanMode(ctx.from.id);
+			const stopTyping = startTyping(this.bot, ctx.from.id);
+			try {
+				await store.unassign(type, date, jobKey, { id: Number(userId), first_name: '' });
+				await this.changed(date);
+				await this.refreshPlanMode(ctx.from.id);
+			} finally {
+				stopTyping();
+			}
 			return ctx.answerCallbackQuery({ text: 'Removed.' });
 		});
 	}
