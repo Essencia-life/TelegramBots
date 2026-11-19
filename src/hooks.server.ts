@@ -1,7 +1,9 @@
-import type { ServerInit } from '@sveltejs/kit';
-import { migrateStorageKey } from '$lib/server/shopping/utils/config';
-
-export const init: ServerInit = async () => {
-	await migrateStorageKey().catch((err) => console.error('Shopping key migration failed', err));
-};
-
+// import { dev } from '$app/environment';
+// import { bot as hiveBot } from '$lib/server/hive/bot';
+// import { bot as shoppingBot } from '$lib/server/shopping/bot';
+// import { bot as orgaBot } from '$lib/server/orga/bot';
+// import { startDevServer } from '$lib/server/bot-utils';
+//
+// if (dev) {
+// 	startDevServer(orgaBot);
+// }
