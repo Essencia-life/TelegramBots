@@ -18,7 +18,7 @@ import {
 import * as store from '../plan-store';
 import type { Plan } from '../plan-store';
 import users, { type TelegramUser } from '../users';
-import { contactResult, isChatAdmin, parseContact, slotPattern } from './planMode';
+import { isChatAdmin, parseChosen, personResult, slotPattern } from './planMode';
 import { BOT_HOME_GROUP_CHAT_ID, VERCEL_BRANCH_URL } from '$env/static/private';
 import topics from '../utils/topics';
 
@@ -28,7 +28,8 @@ const withPlans = (events: PlanEvent[]): Promise<PlannedEvent[]> =>
 	Promise.all(events.map(async (e) => ({ ...e, plan: await store.getPlan(e.type, e.date) })));
 
 const mondayOf = (d: DateTime) => d.setZone(timeZone).set({ weekday: 1 }).startOf('day');
-const isCurrentWeek = (weekStart: DateTime) => weekStart.hasSame(mondayOf(DateTime.now()), 'day');
+/** Plan mode is for the current and coming weeks, not for the past */
+const isPlannableWeek = (weekStart: DateTime) => weekStart >= mondayOf(DateTime.now());
 const parseDate = (key: string) => DateTime.fromFormat(key, 'yyyyLLdd', { zone: timeZone });
 
 export class WeekPlanBot {
@@ -337,7 +338,7 @@ export class WeekPlanBot {
 				callback_data: 'back_to_week'
 			}
 		];
-		if (isCurrentWeek(weekStart) && (await isChatAdmin(this.bot, user.id))) {
+		if (isPlannableWeek(weekStart) && (await isChatAdmin(this.bot, user.id))) {
 			buttons.push({
 				text: 'Plan-Mode',
 				url: `https://t.me/EssenciaOrgaBot?start=planmode_${dateKey(weekStart)}`
@@ -400,9 +401,9 @@ export class WeekPlanBot {
 	}
 
 	private setupPlanModeHandlers() {
-		// the contacts offered for an “Assign person” button; the query is `type:date:job [search]`
+		// the people offered for an “Assign person” button; the query is `type:date:job [search]`
 		this.bot.on('inline_query', async (ctx) => {
-			const answer = (results: ReturnType<typeof contactResult>[], next_offset = '') =>
+			const answer = (results: ReturnType<typeof personResult>[], next_offset = '') =>
 				ctx.answerInlineQuery(results, { cache_time: 0, is_personal: true, next_offset });
 			const match = ctx.inlineQuery.query.match(new RegExp(`^${slotPattern}(?:\\s+(?<search>.*))?$`, 's'));
 
@@ -423,14 +424,14 @@ export class WeekPlanBot {
 			const offset = Number(ctx.inlineQuery.offset) || 0;
 			const page = candidates.slice(offset, offset + 50); // Telegram allows 50 results per answer
 			return answer(
-				page.map((user) => contactResult(user, { type, date, jobKey })),
+				page.map((user) => personResult(user, { type, date, jobKey })),
 				offset + 50 < candidates.length ? String(offset + 50) : ''
 			);
 		});
 
-		// a chosen contact arrives as a message of the bot (via_bot) in the admin's private chat
-		this.bot.on('message:contact', async (ctx, next) => {
-			const chosen = parseContact(ctx.message.contact.vcard);
+		// a chosen person arrives as a message of the bot (via_bot) in the admin's private chat
+		this.bot.on('message:text', async (ctx, next) => {
+			const chosen = parseChosen(ctx.message);
 			if (!chosen || ctx.message.via_bot?.id !== ctx.me.id) return next();
 
 			await ctx.deleteMessage().catch(() => {});
@@ -442,7 +443,7 @@ export class WeekPlanBot {
 
 			const result = await store.assign(type, date, jobKey, job.slots, {
 				id: chosen.userId,
-				first_name: ctx.message.contact.first_name
+				first_name: chosen.firstName
 			});
 			await this.changed(date);
 			await this.refreshPlanMode(ctx.chat.id);
@@ -534,8 +535,8 @@ export class WeekPlanBot {
 			const planMode = ctx.match.match(/^planmode_(\d{8})$/);
 
 			if (planMode) {
-				if (!isCurrentWeek(parseDate(planMode[1]))) {
-					return ctx.reply('Plan mode is only available for the current week.');
+				if (!isPlannableWeek(parseDate(planMode[1]))) {
+					return ctx.reply('Plan mode is not available for past weeks.');
 				}
 
 				if (!(await isChatAdmin(this.bot, ctx.from!.id))) {

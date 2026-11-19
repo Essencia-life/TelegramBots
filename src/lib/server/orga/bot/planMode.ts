@@ -20,22 +20,34 @@ export async function isChatAdmin(bot: Bot, userId: number) {
 	}
 }
 
-// A chosen inline contact arrives as a plain message that only carries what the result had,
-// so the slot and the person travel in the vCard (the result id is not part of the message).
-const NOTE = /NOTE:essencia-plan:([a-z0-9-]+):(\d{8}):([a-z0-9]+):(\d+)/;
+// A chosen inline result arrives as a plain message that only carries what the result had, so the
+// slot and the person travel in a hidden link on the first name (the result id is not part of the message).
+const LINK = /^https:\/\/t\.me\/EssenciaOrgaBot\?start=assign_([a-z0-9-]+)_(\d{8})_([a-z0-9]+)_(\d+)$/;
 
-export function contactResult(user: TelegramUser, { type, date, jobKey }: SlotTarget) {
+export function personResult(user: TelegramUser, { type, date, jobKey }: SlotTarget) {
 	return {
-		type: 'contact' as const,
+		type: 'article' as const,
 		id: String(user.id),
-		phone_number: user.username ? `@${user.username}` : '',
-		first_name: user.first_name,
-		last_name: user.last_name,
-		vcard: `BEGIN:VCARD\nVERSION:3.0\nFN:${[user.first_name, user.last_name].join(' ').trim()}\nNOTE:essencia-plan:${type}:${date}:${jobKey}:${user.id}\nEND:VCARD`
+		title: [user.first_name, user.last_name].join(' ').trim(),
+		description: user.username ? `@${user.username}` : undefined,
+		input_message_content: {
+			message_text: user.first_name,
+			entities: [
+				{
+					type: 'text_link' as const,
+					offset: 0,
+					length: user.first_name.length,
+					url: `https://t.me/EssenciaOrgaBot?start=assign_${type}_${date}_${jobKey}_${user.id}`
+				}
+			]
+		}
 	};
 }
 
-export function parseContact(vcard?: string) {
-	const [, type, date, jobKey, userId] = vcard?.match(NOTE) ?? [];
-	return type ? { target: { type, date, jobKey }, userId: Number(userId) } : null;
+export function parseChosen(message: { text: string; entities?: { type: string; url?: string }[] }) {
+	for (const { type: entity, url } of message.entities ?? []) {
+		const [, type, date, jobKey, userId] = (entity === 'text_link' && url?.match(LINK)) || [];
+		if (type) return { target: { type, date, jobKey }, userId: Number(userId), firstName: message.text };
+	}
+	return null;
 }
