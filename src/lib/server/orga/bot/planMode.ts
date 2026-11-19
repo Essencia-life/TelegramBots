@@ -28,7 +28,7 @@ export function contactResult(user: TelegramUser, { type, date, jobKey }: SlotTa
 	return {
 		type: 'contact' as const,
 		id: String(user.id),
-		phone_number: user.username ? `@${user.username}` : '-',
+		phone_number: user.username ? `@${user.username}` : '',
 		first_name: user.first_name,
 		last_name: user.last_name,
 		vcard: `BEGIN:VCARD\nVERSION:3.0\nFN:${[user.first_name, user.last_name].join(' ').trim()}\nNOTE:essencia-plan:${type}:${date}:${jobKey}:${user.id}\nEND:VCARD`

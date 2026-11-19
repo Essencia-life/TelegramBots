@@ -28,6 +28,7 @@ const withPlans = (events: PlanEvent[]): Promise<PlannedEvent[]> =>
 	Promise.all(events.map(async (e) => ({ ...e, plan: await store.getPlan(e.type, e.date) })));
 
 const mondayOf = (d: DateTime) => d.setZone(timeZone).set({ weekday: 1 }).startOf('day');
+const isCurrentWeek = (weekStart: DateTime) => weekStart.hasSame(mondayOf(DateTime.now()), 'day');
 const parseDate = (key: string) => DateTime.fromFormat(key, 'yyyyLLdd', { zone: timeZone });
 
 export class WeekPlanBot {
@@ -336,7 +337,7 @@ export class WeekPlanBot {
 				callback_data: 'back_to_week'
 			}
 		];
-		if (await isChatAdmin(this.bot, user.id)) {
+		if (isCurrentWeek(weekStart) && (await isChatAdmin(this.bot, user.id))) {
 			buttons.push({
 				text: 'Plan-Mode',
 				url: `https://t.me/EssenciaOrgaBot?start=planmode_${dateKey(weekStart)}`
@@ -533,6 +534,10 @@ export class WeekPlanBot {
 			const planMode = ctx.match.match(/^planmode_(\d{8})$/);
 
 			if (planMode) {
+				if (!isCurrentWeek(parseDate(planMode[1]))) {
+					return ctx.reply('Plan mode is only available for the current week.');
+				}
+
 				if (!(await isChatAdmin(this.bot, ctx.from!.id))) {
 					return ctx.reply('Plan mode is only available for chat admins.');
 				}
