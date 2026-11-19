@@ -12,6 +12,7 @@ export const GET = checkWebhookCallback(bot);
 export const PUT = setupWebhookCallback(bot, ORGA_BOT_SECRET_TOKEN, [
 	'message',
 	'callback_query',
+	'inline_query',
 	'chat_member',
 	'my_chat_member'
 ]);

@@ -87,3 +87,10 @@ export const setMessageId = (kind: 'week' | 'agenda', date: string, id: number) 
 	redis.set(messageKey(kind, date), id, { ex: TTL });
 export const getMessageId = (kind: 'week' | 'agenda', date: string) =>
 	redis.get<number>(messageKey(kind, date));
+
+// the plan-mode message of an admin's private chat, to update it after a change
+const planModeKey = (chatId: number) => `orgaBot:${VERCEL_ENV}:planMode:${chatId}`;
+export const setPlanModeMessage = (chatId: number, id: number, date: string) =>
+	redis.set(planModeKey(chatId), { id, date }, { ex: 24 * 3600 });
+export const getPlanModeMessage = (chatId: number) =>
+	redis.get<{ id: number; date: string }>(planModeKey(chatId));

@@ -17,7 +17,8 @@ import {
 } from '../week-plan-api';
 import * as store from '../plan-store';
 import type { Plan } from '../plan-store';
-import type { TelegramUser } from '../users';
+import users, { type TelegramUser } from '../users';
+import { contactResult, isChatAdmin, parseContact, slotPattern } from './planMode';
 import { BOT_HOME_GROUP_CHAT_ID, VERCEL_BRANCH_URL } from '$env/static/private';
 import topics from '../utils/topics';
 
@@ -37,6 +38,7 @@ export class WeekPlanBot {
 	) {
 		this.setupCallbackHandler();
 		this.setupStartHandler();
+		this.setupPlanModeHandlers();
 	}
 
 	public async sendWeekPlan(nextWeek = true) {
@@ -97,7 +99,11 @@ export class WeekPlanBot {
 		await this.onChange(day);
 	}
 
-	private buildWeekMessage(weekStart: DateTime, events: PlannedEvent[]): InputRichMessage {
+	private buildWeekMessage(
+		weekStart: DateTime,
+		events: PlannedEvent[],
+		planMode = false
+	): InputRichMessage {
 		const blocks: InputRichBlock[] = [
 			{
 				type: 'heading',
@@ -109,7 +115,9 @@ export class WeekPlanBot {
 			},
 			{
 				type: 'paragraph',
-				text: '✍️ Please sign up for the upcoming week by tapping “I will do it” before Monday morning meeting.'
+				text: planMode
+					? '🛠 Plan mode: assign people with “Assign person” or remove them with ✖.'
+					: '✍️ Please sign up for the upcoming week by tapping “I will do it” before Monday morning meeting.'
 			}
 		];
 		const allWeekEvents: PlannedEvent[] = [];
@@ -129,7 +137,7 @@ export class WeekPlanBot {
 
 		if (allWeekEvents.length > 0) {
 			blocks.push({ type: 'heading', size: 2, text: 'All week' });
-			blocks.push(...this.buildEventBlocks(allWeekEvents));
+			blocks.push(...this.buildEventBlocks(allWeekEvents, planMode));
 		}
 
 		for (let weekday = 0; weekday < 7; weekday++) {
@@ -143,7 +151,7 @@ export class WeekPlanBot {
 					.setLocale('en-DE')
 					.toLocaleString({ weekday: 'long', day: 'numeric', month: 'numeric' })
 			});
-			blocks.push(...this.buildEventBlocks(eventsByWeekday.get(weekday) ?? []));
+			blocks.push(...this.buildEventBlocks(eventsByWeekday.get(weekday) ?? [], planMode));
 		}
 
 		blocks.push({
@@ -151,16 +159,18 @@ export class WeekPlanBot {
 			text: ''
 		});
 
-		blocks.push({
-			type: 'buttons',
-			align: 'left',
-			buttons: [
-				{
-					text: 'My Week',
-					callback_data: `my_week:${dateKey(weekStart)}`
-				}
-			]
-		});
+		if (!planMode) {
+			blocks.push({
+				type: 'buttons',
+				align: 'left',
+				buttons: [
+					{
+						text: 'My Week',
+						callback_data: `my_week:${dateKey(weekStart)}`
+					}
+				]
+			});
+		}
 
 		blocks.push({
 			type: 'footer',
@@ -175,7 +185,7 @@ export class WeekPlanBot {
 		return { blocks };
 	}
 
-	private buildEventBlocks(events: PlannedEvent[]): InputRichBlock[] {
+	private buildEventBlocks(events: PlannedEvent[], planMode = false): InputRichBlock[] {
 		const blocks: InputRichBlock[] = [];
 
 		for (const { event, type, date, jobs, plan } of events) {
@@ -195,7 +205,21 @@ export class WeekPlanBot {
 								url: `tg://user?id=${person.id}`
 							}
 						: person.first_name;
-					return index === 0 ? [name] : [' & ', name];
+					const parts: RichText[] = planMode
+						? [
+								name,
+								' ',
+								{
+									type: 'button',
+									button: {
+										text: '✖',
+										callback_data: `rm:${type}:${date}:${job.key}:${person.id}`,
+										style: 'danger'
+									}
+								}
+							]
+						: [name];
+					return index === 0 ? parts : [' & ', ...parts];
 				});
 				const text: RichText[] = [job.title, ': '];
 
@@ -204,7 +228,12 @@ export class WeekPlanBot {
 				}
 
 				if (persons.length < job.slots) {
-					const button: RichMessageButton = job.askDetails
+					const button: RichMessageButton = planMode
+						? {
+								text: 'Assign person',
+								switch_inline_query_current_chat: `${type}:${date}:${job.key} `
+							}
+						: job.askDetails
 						? {
 								text: 'I will do it',
 								url: `https://t.me/EssenciaOrgaBot?start=plan_${type}_${date}_${job.key}`
@@ -301,16 +330,19 @@ export class WeekPlanBot {
 			});
 		}
 
-		blocks.push({
-			type: 'buttons',
-			align: 'left',
-			buttons: [
-				{
-					text: 'Back to the week',
-					callback_data: 'back_to_week'
-				}
-			]
-		});
+		const buttons: RichMessageButton[] = [
+			{
+				text: 'Back to the week',
+				callback_data: 'back_to_week'
+			}
+		];
+		if (await isChatAdmin(this.bot, user.id)) {
+			buttons.push({
+				text: 'Plan-Mode',
+				url: `https://t.me/EssenciaOrgaBot?start=planmode_${dateKey(weekStart)}`
+			});
+		}
+		blocks.push({ type: 'buttons', align: 'left', buttons });
 
 		// Bot API 10.4: a reply to a callback query needs no receiver_user_id; passing it with
 		// message_thread_id ended in REPLY_TO_INVALID.
@@ -340,6 +372,94 @@ export class WeekPlanBot {
 		}
 
 		await send(callbackQueryId ? { callback_query_id: callbackQueryId } : {});
+	}
+
+	/** Week plan with “Assign person” and ✖ buttons for admins, in the private chat with the bot */
+	private async sendPlanMode(chatId: number, weekStart: DateTime) {
+		const events = await withPlans(await getWeekEvents(weekStart));
+		const message = await this.bot.api.sendRichMessage(
+			chatId,
+			this.buildWeekMessage(weekStart, events, true)
+		);
+		await store.setPlanModeMessage(chatId, message.message_id, dateKey(weekStart));
+	}
+
+	private async refreshPlanMode(chatId: number) {
+		const shown = await store.getPlanModeMessage(chatId);
+		if (!shown) return;
+
+		const weekStart = parseDate(shown.date);
+		const events = await withPlans(await getWeekEvents(weekStart));
+		await this.bot.api
+			.editMessageText(chatId, shown.id, this.buildWeekMessage(weekStart, events, true))
+			.catch((error) => {
+				if (!(error instanceof GrammyError) || !/message is not modified/i.test(error.description))
+					throw error;
+			});
+	}
+
+	private setupPlanModeHandlers() {
+		// the contacts offered for an “Assign person” button; the query is `type:date:job [search]`
+		this.bot.on('inline_query', async (ctx) => {
+			const answer = (results: ReturnType<typeof contactResult>[], next_offset = '') =>
+				ctx.answerInlineQuery(results, { cache_time: 0, is_personal: true, next_offset });
+			const match = ctx.inlineQuery.query.match(new RegExp(`^${slotPattern}(?:\\s+(?<search>.*))?$`, 's'));
+
+			if (!match || !(await isChatAdmin(this.bot, ctx.from.id))) return answer([]);
+
+			const { type, date, jobKey, search = '' } = match.groups!;
+			const taken = new Set((await store.getPlan(type, date))[jobKey]?.persons.map((p) => p.id));
+			const needle = search.trim().toLowerCase();
+			const candidates = (await users.getAll())
+				.filter(
+					(user) =>
+						user.id &&
+						!taken.has(user.id) &&
+						[user.first_name, user.last_name, user.username].join(' ').toLowerCase().includes(needle)
+				)
+				.sort((a, b) => a.first_name.localeCompare(b.first_name));
+
+			const offset = Number(ctx.inlineQuery.offset) || 0;
+			const page = candidates.slice(offset, offset + 50); // Telegram allows 50 results per answer
+			return answer(
+				page.map((user) => contactResult(user, { type, date, jobKey })),
+				offset + 50 < candidates.length ? String(offset + 50) : ''
+			);
+		});
+
+		// a chosen contact arrives as a message of the bot (via_bot) in the admin's private chat
+		this.bot.on('message:contact', async (ctx, next) => {
+			const chosen = parseContact(ctx.message.contact.vcard);
+			if (!chosen || ctx.message.via_bot?.id !== ctx.me.id) return next();
+
+			await ctx.deleteMessage().catch(() => {});
+			if (ctx.chat.type !== 'private' || !(await isChatAdmin(this.bot, ctx.from.id))) return;
+
+			const { type, date, jobKey } = chosen.target;
+			const job = (await findPlanEvent(type, date))?.jobs.find((item) => item.key === jobKey);
+			if (!job) return ctx.reply('This job does not exist anymore.');
+
+			const result = await store.assign(type, date, jobKey, job.slots, {
+				id: chosen.userId,
+				first_name: ctx.message.contact.first_name
+			});
+			await this.changed(date);
+			await this.refreshPlanMode(ctx.chat.id);
+
+			if (result === 'full') return ctx.reply(`“${job.title}” is already full.`);
+		});
+
+		this.bot.callbackQuery(/^rm:(?<type>[a-z0-9-]+):(?<date>\d{8}):(?<jobKey>[a-z0-9]+):(?<userId>\d+)$/, async (ctx) => {
+			if (!(await isChatAdmin(this.bot, ctx.from.id))) {
+				return ctx.answerCallbackQuery({ text: 'Only chat admins can do this.', show_alert: true });
+			}
+
+			const { type, date, jobKey, userId } = (ctx.match as RegExpMatchArray).groups!;
+			await store.unassign(type, date, jobKey, { id: Number(userId), first_name: '' });
+			await this.changed(date);
+			await this.refreshPlanMode(ctx.from.id);
+			return ctx.answerCallbackQuery({ text: 'Removed.' });
+		});
 	}
 
 	private setupCallbackHandler() {
@@ -410,6 +530,16 @@ export class WeekPlanBot {
 			tag`Please let us know more about what ${type} you want to offer. First line a short title and following lines optional details (e.g. are Kids welcome?).`;
 
 		this.bot.command('start', async (ctx) => {
+			const planMode = ctx.match.match(/^planmode_(\d{8})$/);
+
+			if (planMode) {
+				if (!(await isChatAdmin(this.bot, ctx.from!.id))) {
+					return ctx.reply('Plan mode is only available for chat admins.');
+				}
+
+				return this.sendPlanMode(ctx.chat.id, parseDate(planMode[1]));
+			}
+
 			const match = ctx.match.match(
 				/^plan_(?<type>[a-z0-9-]+)_(?<date>\d{8})_(?<jobKey>[a-z0-9]+)$/
 			);
