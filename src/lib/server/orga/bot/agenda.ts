@@ -182,7 +182,7 @@ function jobBlocks(planEvent: PlanEvent | undefined, plan: Plan | undefined): In
 	return blocks;
 }
 
-function eventBlock(event: CalendarEvent, plans: Plans): InputRichBlock {
+function eventBlocks(event: CalendarEvent, plans: Plans): InputRichBlock[] {
 	const title: RichText[] = [];
 
 	if (event.start?.dateTime) {
@@ -213,7 +213,11 @@ function eventBlock(event: CalendarEvent, plans: Plans): InputRichBlock {
 		)
 	);
 
-	return { type: 'blockquote', blocks };
+	const sos = sosButtons(event, plans);
+	return [
+		{ type: 'blockquote', blocks },
+		...(sos.length ? [{ type: 'buttons' as const, align: 'left' as const, buttons: sos }] : [])
+	];
 }
 
 function byStartDate(a: CalendarEvent, b: CalendarEvent) {
@@ -225,11 +229,8 @@ function byStartDate(a: CalendarEvent, b: CalendarEvent) {
 function buildAgenda(date: DateTime, events: CalendarEvent[], plans: Plans): InputRichMessage {
 	const blocks: InputRichBlock[] = [
 		{ type: 'heading', size: 1, text: `🗓️ Agenda for ${date.setLocale('en').toFormat('cccc')}` },
-		...events.map((event) => eventBlock(event, plans))
+		...events.flatMap((event) => eventBlocks(event, plans))
 	];
-
-	const sos = sosButtons(events, plans);
-	if (sos.length) blocks.push({ type: 'buttons', align: 'left', buttons: sos });
 
 	blocks.push({
 		type: 'footer',
@@ -244,26 +245,20 @@ function buildAgenda(date: DateTime, events: CalendarEvent[], plans: Plans): Inp
 	return { blocks };
 }
 
-/** open jobs that are marked as urgent (sos) */
-function sosButtons(events: CalendarEvent[], plans: Plans) {
-	const buttons: RichMessageButton[] = [];
+/** open jobs of an event that are marked as urgent (sos) */
+function sosButtons(event: CalendarEvent, plans: Plans) {
+	const entry = plans.get(event.id!);
+	// Skip weekly tasks
+	if (!entry || !event.start?.dateTime) return [];
 
-	for (const event of events) {
-		const entry = plans.get(event.id!);
-		// Skip weekly tasks
-		if (!entry || !event.start?.dateTime) continue;
+	const { type, date, jobs } = entry.planEvent;
+	const weekday = new Date(event.start.dateTime).toLocaleDateString('en', { weekday: 'long' });
 
-		const { type, date, jobs } = entry.planEvent;
-		for (const { key, title, sos } of jobs) {
-			if (sos && !entry.plan[key]?.persons.length) {
-				buttons.push({
-					text: `🆘 I will do ${title} on ${new Date(event.start.dateTime).toLocaleDateString('en', { weekday: 'long' })}!`,
-					callback_data: `plan:${type}:${date}:${key}`,
-					style: 'danger'
-				});
-			}
-		}
-	}
-
-	return buttons;
+	return jobs
+		.filter(({ key, sos }) => sos && !entry.plan[key]?.persons.length)
+		.map(({ key, title }): RichMessageButton => ({
+			text: `🆘 I will do ${title} on ${weekday}!`,
+			callback_data: `plan:${type}:${date}:${key}`,
+			style: 'danger'
+		}));
 }
