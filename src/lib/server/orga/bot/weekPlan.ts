@@ -5,107 +5,151 @@ import type {
 	RichText,
 	RichMessageButton
 } from 'grammy/types';
-import { type CalendarEvent } from '$lib/server/calendar';
 import { DateTime } from 'luxon';
-import weekPlanApi, {
-	type EventProps,
-	type EventPropsJobs,
-	type WeeklyJobsConfigs
+import type { CalendarEvent } from '$lib/server/calendar';
+import {
+	calendarByName,
+	dateKey,
+	findPlanEvent,
+	getWeekEvents,
+	timeZone,
+	type PlanEvent
 } from '../week-plan-api';
-import weeklyJobs from '$lib/client/orga/config/weekly-jobs.json';
-import type { TelegramUser } from '../users';
-import { BOT_HOME_GROUP_CHAT_ID } from '$env/static/private';
+import * as store from '../plan-store';
+import type { Plan } from '../plan-store';
+import users, { type TelegramUser } from '../users';
+import { isChatAdmin, parseChosen, personResult, slotPattern, startTyping } from './planMode';
+import { BOT_HOME_GROUP_CHAT_ID, VERCEL_BRANCH_URL } from '$env/static/private';
 import topics from '../utils/topics';
 
-const timeZone = 'Europe/Lisbon';
-const configs = weeklyJobs.config as WeeklyJobsConfigs;
+type PlannedEvent = PlanEvent & { plan: Plan };
+
+const withPlans = (events: PlanEvent[]): Promise<PlannedEvent[]> =>
+	Promise.all(events.map(async (e) => ({ ...e, plan: await store.getPlan(e.type, e.date) })));
+
+const mondayOf = (d: DateTime) => d.setZone(timeZone).set({ weekday: 1 }).startOf('day');
+/** Plan mode is for the current and coming weeks, not for the past */
+const isPlannableWeek = (weekStart: DateTime) => weekStart >= mondayOf(DateTime.now());
+const parseDate = (key: string) => DateTime.fromFormat(key, 'yyyyLLdd', { zone: timeZone });
 
 export class WeekPlanBot {
-	constructor(private readonly bot: Bot) {
+	/** `onChange` lets the daily agenda post follow sign-ups (the calendar no longer changes with them) */
+	constructor(
+		private readonly bot: Bot,
+		private readonly onChange: (date: DateTime) => Promise<void> = async () => {}
+	) {
 		this.setupCallbackHandler();
 		this.setupStartHandler();
+		this.setupPlanModeHandlers();
 	}
 
-	public async sendWeekPlan(nextWeek = true, createEvents = true) {
-		const weekStart = DateTime.now()
-			.setZone(timeZone)
-			.plus({ weeks: nextWeek ? 1 : 0 })
-			.set({ weekday: 1 });
+	public async sendWeekPlan(nextWeek = true) {
+		const weekStart = mondayOf(DateTime.now().plus({ weeks: nextWeek ? 1 : 0 }));
 
 		console.info('Sending week plan starting from', weekStart);
 
-		const allEvents = await (createEvents
-			? weekPlanApi.createEvents(weekStart)
-			: weekPlanApi.getWeekEvents(weekStart));
+		const events = await withPlans(await getWeekEvents(weekStart));
+		if (!events.length) return console.info('No events with jobs in that week');
+
 		const message = await this.bot.api.sendRichMessage(
 			BOT_HOME_GROUP_CHAT_ID,
-			this.buildWeekMessage(weekStart, allEvents),
+			this.buildWeekMessage(weekStart, events),
 			{ message_thread_id: topics.weeklyJobs }
 		);
 
-		for (const event of allEvents) {
-			if (!event.id || !event.extendedProperties?.private?.type) {
-				throw new Error('Cannot attach the weekly plan message to an event without an id or type.');
-			}
-
-			await weekPlanApi.setPlanMessageId(
-				event.extendedProperties.private.type,
-				event.id,
-				message.message_id
-			);
-		}
+		await store.setMessageId('week', dateKey(weekStart), message.message_id);
+		await this.watchCalendar(weekStart).catch((error) => console.error('Could not watch the calendars', error));
 	}
 
-	private async updateWeekPlan(messageId: number) {
-		const events = await weekPlanApi.getEventsByPlanMessageId(messageId);
-		if (events.length === 0) return;
-
-		const weekStart = getEventDate(events[0]).set({ weekday: 1 }).startOf('day');
-		await this.bot.api.editMessageText(
-			BOT_HOME_GROUP_CHAT_ID,
-			messageId,
-			this.buildWeekMessage(weekStart, events)
+	/** The calendar changes the week plan shows (titles, times, jobs) update the message through a webhook. */
+	private watchCalendar(weekStart: DateTime) {
+		const end = weekStart.plus({ days: 6 }).endOf('day');
+		return Promise.all(
+			Object.values(calendarByName).map((calendar) =>
+				calendar.watchEvents(weekStart.toJSDate(), end.toJSDate(), {
+					id: crypto.randomUUID(),
+					token: JSON.stringify({ weekStart: weekStart.toISODate() }),
+					type: 'webhook',
+					address: `https://${VERCEL_BRANCH_URL}/orga/api/telegram/week-plan`,
+					expiration: end.toMillis().toString()
+				})
+			)
 		);
 	}
 
-	private buildWeekMessage(weekStart: DateTime, events: CalendarEvent[]): InputRichMessage {
+	public async updateWeekPlan(weekStart: DateTime) {
+		const messageId = await store.getMessageId('week', dateKey(weekStart));
+		if (!messageId) return;
+
+		const events = await withPlans(await getWeekEvents(weekStart));
+		try {
+			await this.bot.api.editMessageText(
+				BOT_HOME_GROUP_CHAT_ID,
+				messageId,
+				this.buildWeekMessage(weekStart, events)
+			);
+		} catch (error) {
+			// two updates within the same second render the same text (the footer has the time); Telegram answers 400
+			if (!(error instanceof GrammyError) || !/message is not modified/i.test(error.description)) throw error;
+		}
+	}
+
+	/** after a sign-up change: refresh the week plan and the agenda of that day */
+	private async changed(date: string) {
+		const day = parseDate(date);
+		await this.updateWeekPlan(mondayOf(day));
+		await this.onChange(day);
+	}
+
+	private buildWeekMessage(
+		weekStart: DateTime,
+		events: PlannedEvent[],
+		planMode = false
+	): InputRichMessage {
 		const blocks: InputRichBlock[] = [
 			{
 				type: 'heading',
 				size: 1,
-				text: `Week of ${weekStart.toLocaleString({ day: 'numeric' })}–${weekStart
-					.plus({ days: 4 })
+				text: `${planMode ? '🛠' : '✍️'} Week of ${weekStart.toLocaleString({ day: 'numeric' })}–${weekStart
+					.plus({ days: 6 })
 					.setLocale('en-DE')
 					.toLocaleString({ day: 'numeric', month: 'numeric' })}`
 			},
 			{
-				type: 'paragraph',
-				text: '✍️ Please sign up for the upcoming week by tapping “I will do it” before Monday morning meeting.'
+				type: 'blockquote',
+				blocks: [
+					{
+						type: 'paragraph',
+						text: planMode
+							? 'Plan mode: assign people with “Assign person” or remove them with ✖.'
+							: 'Please sign up for the upcoming week by tapping “I will do it” before Monday morning meeting.'
+					}
+				]
 			}
 		];
-		const allWeekEvents: CalendarEvent[] = [];
-		const eventsByWeekday = new Map<number, CalendarEvent[]>();
+		const allWeekEvents: PlannedEvent[] = [];
+		const eventsByWeekday = new Map<number, PlannedEvent[]>();
 
-		for (const event of [...events].sort(
-			(a, b) => getEventDate(a).toMillis() - getEventDate(b).toMillis()
+		for (const item of [...events].sort(
+			(a, b) => getEventDate(a.event).toMillis() - getEventDate(b.event).toMillis()
 		)) {
-			if (event.start?.date && !event.start.dateTime) {
-				allWeekEvents.push(event);
+			if (isMultiDay(item.event)) {
+				allWeekEvents.push(item);
 				continue;
 			}
 
-			const weekday = getEventDate(event).weekday - 1;
-			const dayEvents = eventsByWeekday.get(weekday) ?? [];
-			dayEvents.push(event);
-			eventsByWeekday.set(weekday, dayEvents);
+			const weekday = getEventDate(item.event).weekday - 1;
+			eventsByWeekday.set(weekday, [...(eventsByWeekday.get(weekday) ?? []), item]);
 		}
 
 		if (allWeekEvents.length > 0) {
 			blocks.push({ type: 'heading', size: 2, text: 'All week' });
-			blocks.push(...this.buildEventBlocks(allWeekEvents));
+			blocks.push(...this.buildEventBlocks(allWeekEvents, planMode));
 		}
 
-		for (let weekday = 0; weekday < 5; weekday++) {
+		for (let weekday = 0; weekday < 7; weekday++) {
+			// Saturday and Sunday only show up when something is planned
+			if (weekday >= 5 && !eventsByWeekday.has(weekday)) continue;
 			const date = weekStart.plus({ days: weekday });
 			blocks.push({
 				type: 'heading',
@@ -114,7 +158,7 @@ export class WeekPlanBot {
 					.setLocale('en-DE')
 					.toLocaleString({ weekday: 'long', day: 'numeric', month: 'numeric' })
 			});
-			blocks.push(...this.buildEventBlocks(eventsByWeekday.get(weekday) ?? []));
+			blocks.push(...this.buildEventBlocks(eventsByWeekday.get(weekday) ?? [], planMode));
 		}
 
 		blocks.push({
@@ -122,16 +166,18 @@ export class WeekPlanBot {
 			text: ''
 		});
 
-		blocks.push({
-			type: 'buttons',
-			align: 'left',
-			buttons: [
-				{
-					text: 'My Week',
-					callback_data: 'my_week'
-				}
-			]
-		});
+		if (!planMode) {
+			blocks.push({
+				type: 'buttons',
+				align: 'left',
+				buttons: [
+					{
+						text: 'My Week',
+						callback_data: `my_week:${dateKey(weekStart)}`
+					}
+				]
+			});
+		}
 
 		blocks.push({
 			type: 'footer',
@@ -146,28 +192,19 @@ export class WeekPlanBot {
 		return { blocks };
 	}
 
-	private buildEventBlocks(events: CalendarEvent[]): InputRichBlock[] {
+	private buildEventBlocks(events: PlannedEvent[], planMode = false): InputRichBlock[] {
 		const blocks: InputRichBlock[] = [];
 
-		for (const event of events) {
-			const props = event.extendedProperties?.private as unknown as EventProps | undefined;
-			const config = configs.find((item) => item.name === props?.type);
-			if (!props || !config) continue;
-
-			if (!event.id) {
-				throw new Error(`Cannot render weekly plan event "${event.summary}" without an id.`);
-			}
-
-			const assignedJobs: EventPropsJobs = JSON.parse(props.jobs);
+		for (const { event, type, date, jobs, plan } of events) {
 			blocks.push({
 				type: 'heading',
 				size: 5,
 				text: event.summary ?? ''
 			});
 
-			for (const job of config.jobs) {
-				const assignedJob = assignedJobs[job.name] ?? { title: job.title, persons: [] };
-				const people = assignedJob.persons.flatMap((person, index): RichText[] => {
+			for (const job of jobs) {
+				const persons = plan[job.key]?.persons ?? [];
+				const people = persons.flatMap((person, index): RichText[] => {
 					const name: RichText = person.id
 						? {
 								type: 'url',
@@ -175,7 +212,21 @@ export class WeekPlanBot {
 								url: `tg://user?id=${person.id}`
 							}
 						: person.first_name;
-					return index === 0 ? [name] : [' & ', name];
+					const parts: RichText[] = planMode
+						? [
+								name,
+								' ',
+								{
+									type: 'button',
+									button: {
+										text: '×',
+										callback_data: `rm:${type}:${date}:${job.key}:${person.id}`,
+										style: 'danger'
+									}
+								}
+							]
+						: [name];
+					return index === 0 ? parts : [' & ', ...parts];
 				});
 				const text: RichText[] = [job.title, ': '];
 
@@ -183,17 +234,21 @@ export class WeekPlanBot {
 					text.push(...people);
 				}
 
-				if (assignedJob.persons.length < job.persons) {
-					const button: RichMessageButton =
-						'askDetails' in job && job.askDetails
-							? {
-									text: 'I will do it',
-									url: `https://t.me/EssenciaOrgaBot?start=plan_${event.id}_${job.name}`
-								}
-							: {
-									text: 'I will do it',
-									callback_data: `plan:${event.id}:${job.name}`
-								};
+				if (persons.length < job.slots) {
+					const button: RichMessageButton = planMode
+						? {
+								text: 'Assign person',
+								switch_inline_query_current_chat: `${type}:${date}:${job.key} `
+							}
+						: job.askDetails
+						? {
+								text: 'I will do it',
+								url: `https://t.me/EssenciaOrgaBot?start=plan_${type}_${date}_${job.key}`
+							}
+						: {
+								text: 'I will do it',
+								callback_data: `plan:${type}:${date}:${job.key}`
+							};
 
 					if (text.length > 2) {
 						text.push(' & ');
@@ -224,34 +279,28 @@ export class WeekPlanBot {
 	}
 
 	private async sendUserWeekSummary(
-		messageId: number,
+		weekStart: DateTime,
 		user: TelegramUser,
 		callbackQueryId?: string,
 		replaceCallbackQueryMessage = false
 	) {
 		if (!user.id) return;
 
-		const events = await weekPlanApi.getEventsByPlanMessageId(messageId);
+		const events = await withPlans(await getWeekEvents(weekStart));
 		const blocks: InputRichBlock[] = [
 			{ type: 'heading', size: 1, text: `Your week, ${user.first_name}` }
 		];
 		let hasAssignments = false;
 
-		for (const event of events) {
-			const props = event.extendedProperties?.private as unknown as EventProps | undefined;
-			const config = configs.find((item) => item.name === props?.type);
-			if (!props || !config || !event.id) continue;
-
-			const assignedJobs: EventPropsJobs = JSON.parse(props.jobs);
+		for (const { event, type, date, jobs, plan } of events) {
 			const eventLabel =
-				event.start?.date && !event.start.dateTime
+				isMultiDay(event)
 					? 'All week'
 					: getEventDate(event).toLocaleString({ weekday: 'long', day: 'numeric', month: 'numeric' });
 			let eventHeadingAdded = false;
 
-			for (const job of config.jobs) {
-				const assignedJob = assignedJobs[job.name];
-				if (!assignedJob?.persons.some((person) => person.id === user.id)) continue;
+			for (const job of jobs) {
+				if (!plan[job.key]?.persons.some((person) => person.id === user.id)) continue;
 				hasAssignments = true;
 
 				if (!eventHeadingAdded) {
@@ -269,7 +318,7 @@ export class WeekPlanBot {
 							button: {
 								style: 'danger',
 								text: 'Handover',
-								callback_data: `unassign:${event.id}:${job.name}`
+								callback_data: `unassign:${type}:${date}:${job.key}`
 							}
 						}
 					]
@@ -288,16 +337,19 @@ export class WeekPlanBot {
 			});
 		}
 
-		blocks.push({
-			type: 'buttons',
-			align: 'left',
-			buttons: [
-				{
-					text: 'Back to the week',
-					callback_data: 'back_to_week'
-				}
-			]
-		});
+		const buttons: RichMessageButton[] = [
+			{
+				text: 'Back to the week',
+				callback_data: 'back_to_week'
+			}
+		];
+		if (isPlannableWeek(weekStart) && (await isChatAdmin(this.bot, user.id))) {
+			buttons.push({
+				text: 'Plan-Mode',
+				url: `https://t.me/EssenciaOrgaBot?start=planmode_${dateKey(weekStart)}`
+			});
+		}
+		blocks.push({ type: 'buttons', align: 'left', buttons });
 
 		// Bot API 10.4: a reply to a callback query needs no receiver_user_id; passing it with
 		// message_thread_id ended in REPLY_TO_INVALID.
@@ -329,16 +381,117 @@ export class WeekPlanBot {
 		await send(callbackQueryId ? { callback_query_id: callbackQueryId } : {});
 	}
 
-	private setupCallbackHandler() {
-		this.bot.callbackQuery(/^my_week$/, async (ctx) => {
-			const user = ctx.from;
-			const messageId = Number(ctx.callbackQuery.message?.message_id);
+	/** Week plan with “Assign person” and ✖ buttons for admins, in the private chat with the bot */
+	private async sendPlanMode(chatId: number, weekStart: DateTime) {
+		startTyping(this.bot, chatId);
+		const events = await withPlans(await getWeekEvents(weekStart));
+		const message = await this.bot.api.sendRichMessage(
+			chatId,
+			this.buildWeekMessage(weekStart, events, true)
+		);
+		await store.setPlanModeMessage(chatId, message.message_id, dateKey(weekStart));
+	}
 
-			if (!user || !Number.isInteger(messageId)) {
-				return ctx.answerCallbackQuery({ text: 'Could not open your week.' });
+	private async refreshPlanMode(chatId: number) {
+		const shown = await store.getPlanModeMessage(chatId);
+		if (!shown) return;
+
+		const weekStart = parseDate(shown.date);
+		const events = await withPlans(await getWeekEvents(weekStart));
+		await this.bot.api
+			.editMessageText(chatId, shown.id, this.buildWeekMessage(weekStart, events, true))
+			.catch((error) => {
+				if (!(error instanceof GrammyError) || !/message is not modified/i.test(error.description))
+					throw error;
+			});
+	}
+
+	private setupPlanModeHandlers() {
+		// the people offered for an “Assign person” button; the query is `type:date:job [search]`
+		this.bot.on('inline_query', async (ctx) => {
+			const answer = (results: ReturnType<typeof personResult>[], next_offset = '') =>
+				ctx.answerInlineQuery(results, { cache_time: 0, is_personal: true, next_offset });
+			const match = ctx.inlineQuery.query.match(new RegExp(`^${slotPattern}(?:\\s+(?<search>.*))?$`, 's'));
+
+			if (!match || !(await isChatAdmin(this.bot, ctx.from.id))) return answer([]);
+
+			const { type, date, jobKey, search = '' } = match.groups!;
+			const planEvent = await findPlanEvent(type, date);
+			const job = planEvent?.jobs.find((item) => item.key === jobKey);
+			if (!planEvent || !job) return answer([]);
+
+			const day = parseDate(date)
+				.setLocale('en-DE')
+				.toLocaleString({ weekday: 'long', day: 'numeric', month: 'numeric' });
+			const summary = planEvent.event.summary;
+			const slotLabel = `on ${day} as ${job.title}${summary ? ` (${summary})` : ''}`;
+			const taken = new Set((await store.getPlan(type, date))[jobKey]?.persons.map((p) => p.id));
+			const needle = search.trim().toLowerCase();
+			const candidates = (await users.getAll())
+				.filter(
+					(user) =>
+						user.id &&
+						!taken.has(user.id) &&
+						[user.first_name, user.last_name, user.username].join(' ').toLowerCase().includes(needle)
+				)
+				.sort((a, b) => a.first_name.localeCompare(b.first_name));
+
+			const offset = Number(ctx.inlineQuery.offset) || 0;
+			const page = candidates.slice(offset, offset + 50); // Telegram allows 50 results per answer
+			return answer(
+				page.map((user) => personResult(user, { type, date, jobKey }, slotLabel)),
+				offset + 50 < candidates.length ? String(offset + 50) : ''
+			);
+		});
+
+		// a chosen person arrives as a message of the bot (via_bot) in the admin's private chat
+		this.bot.on('message:text', async (ctx, next) => {
+			const chosen = parseChosen(ctx.message);
+			if (!chosen || ctx.message.via_bot?.id !== ctx.me.id) return next();
+
+			startTyping(this.bot, ctx.chat.id);
+			try {
+				if (ctx.chat.type !== 'private' || !(await isChatAdmin(this.bot, ctx.from.id))) return;
+
+				const { type, date, jobKey } = chosen.target;
+				const job = (await findPlanEvent(type, date))?.jobs.find((item) => item.key === jobKey);
+				if (!job) return ctx.reply('This job does not exist anymore.');
+
+				const result = await store.assign(type, date, jobKey, job.slots, {
+					id: chosen.userId,
+					first_name: chosen.firstName
+				});
+				await this.changed(date);
+				await this.refreshPlanMode(ctx.chat.id);
+
+				if (result === 'full') return ctx.reply(`“${job.title}” is already full.`);
+			} finally {
+				// stays visible until the plan mode message shows the change
+				await ctx.deleteMessage().catch(() => {});
+			}
+		});
+
+		this.bot.callbackQuery(/^rm:(?<type>[a-z0-9-]+):(?<date>\d{8}):(?<jobKey>[a-z0-9]+):(?<userId>\d+)$/, async (ctx) => {
+			if (!(await isChatAdmin(this.bot, ctx.from.id))) {
+				return ctx.answerCallbackQuery({ text: 'Only chat admins can do this.', show_alert: true });
 			}
 
-			await this.sendUserWeekSummary(messageId, user, ctx.callbackQuery.id, true);
+			const { type, date, jobKey, userId } = (ctx.match as RegExpMatchArray).groups!;
+			startTyping(this.bot, ctx.from.id);
+			await store.unassign(type, date, jobKey, { id: Number(userId), first_name: '' });
+			await this.changed(date);
+			await this.refreshPlanMode(ctx.from.id);
+			return ctx.answerCallbackQuery({ text: 'Removed.' });
+		});
+	}
+
+	private setupCallbackHandler() {
+		this.bot.callbackQuery(/^my_week(?::(?<date>\d{8}))?$/, async (ctx) => {
+			const user = ctx.from;
+			const date = (ctx.match as RegExpMatchArray).groups?.date;
+			const weekStart = date ? parseDate(date) : mondayOf(DateTime.now());
+
+			await this.sendUserWeekSummary(weekStart, user, ctx.callbackQuery.id, true);
 			return ctx.answerCallbackQuery().catch(() => {});
 		});
 
@@ -348,49 +501,42 @@ export class WeekPlanBot {
 		});
 
 		this.bot.callbackQuery(
-			/^(?<action>plan|unassign):(?<eventId>[\w-]+):(?<jobName>[\w-]+)$/,
+			/^(?<action>plan|unassign):(?<type>[a-z0-9-]+):(?<date>\d{8}):(?<jobKey>[a-z0-9]+)$/,
 			async (ctx) => {
-				if (typeof ctx.match !== 'object' || !('groups' in ctx.match)) return;
-
-				const { action, eventId, jobName } = ctx.match.groups!;
+				const { action, type, date, jobKey } = (ctx.match as RegExpMatchArray).groups!;
 				const user = ctx.from;
-				console.info('Received week-plan callbackQuery', { action, eventId, jobName, user });
+				console.info('Received week-plan callbackQuery', { action, type, date, jobKey, user });
 
-				const eventProps = await weekPlanApi.getEventsProps(eventId);
-				const messageId = Number(eventProps.planMessageId);
-				const assignedJobs: EventPropsJobs = JSON.parse(eventProps.jobs);
-				const assignedJob = assignedJobs[jobName];
-				const jobDefinition = configs
-					.find((config) => config.name === eventProps.type)
-					?.jobs.find((job) => job.name === jobName);
-
-				if (!Number.isInteger(messageId) || !assignedJob || !jobDefinition) {
-					throw new Error(
-						`Invalid weekly-plan callback data for event ${eventId}, job ${jobName}.`
-					);
-				}
-
-				if (action === 'unassign') {
-					await weekPlanApi.unassignFromJob(eventProps.type, eventId, assignedJobs, jobName, user);
-					await this.updateWeekPlan(messageId);
-					return ctx.answerCallbackQuery({ text: 'You removed yourself from this job.' });
-				}
-
-				if (assignedJob.persons.some((person) => person.id === user.id)) {
-					await this.updateWeekPlan(messageId);
-					return ctx.answerCallbackQuery({ text: 'You have already signed up for this job.' });
-				}
-
-				if (assignedJob.persons.length >= jobDefinition.persons) {
-					await this.updateWeekPlan(messageId);
+				const planEvent = await findPlanEvent(type, date);
+				const job = planEvent?.jobs.find((item) => item.key === jobKey);
+				if (!job) {
 					return ctx.answerCallbackQuery({
 						show_alert: true,
-						text: `This job is already taken by ${assignedJob.persons.map((person) => person.first_name).join(', ')}.`
+						text: 'This job does not exist anymore.'
 					});
 				}
 
-				await weekPlanApi.assignToJob(eventProps.type, eventId, assignedJobs, jobName, user);
-				await this.updateWeekPlan(messageId);
+				if (action === 'unassign') {
+					await store.unassign(type, date, jobKey, user);
+					await this.changed(date);
+					return ctx.answerCallbackQuery({ text: 'You removed yourself from this job.' });
+				}
+
+				const result = await store.assign(type, date, jobKey, job.slots, user);
+				await this.changed(date);
+
+				if (result === 'already') {
+					return ctx.answerCallbackQuery({ text: 'You have already signed up for this job.' });
+				}
+
+				if (result === 'full') {
+					const { persons } = (await store.getPlan(type, date))[jobKey] ?? { persons: [] };
+					return ctx.answerCallbackQuery({
+						show_alert: true,
+						text: `This job is already taken by ${persons.map((person) => person.first_name).join(', ')}.`
+					});
+				}
+
 				return ctx.answerCallbackQuery({ text: "✅ you've signed up" });
 			}
 		);
@@ -407,39 +553,47 @@ export class WeekPlanBot {
 			tag`Please let us know more about what ${type} you want to offer. First line a short title and following lines optional details (e.g. are Kids welcome?).`;
 
 		this.bot.command('start', async (ctx) => {
-			const match = ctx.match.match(/^plan_(?<eventId>\w+)_(?<jobName>\w+)$/);
+			const planMode = ctx.match.match(/^planmode_(\d{8})$/);
+
+			if (planMode) {
+				if (!isPlannableWeek(parseDate(planMode[1]))) {
+					return ctx.reply('Plan mode is not available for past weeks.');
+				}
+
+				if (!(await isChatAdmin(this.bot, ctx.from!.id))) {
+					return ctx.reply('Plan mode is only available for chat admins.');
+				}
+
+				return this.sendPlanMode(ctx.chat.id, parseDate(planMode[1]));
+			}
+
+			const match = ctx.match.match(
+				/^plan_(?<type>[a-z0-9-]+)_(?<date>\d{8})_(?<jobKey>[a-z0-9]+)$/
+			);
 
 			if (match !== null && 'groups' in match) {
-				const { eventId, jobName } = match.groups!;
+				const { type, date, jobKey } = match.groups!;
 				const user = ctx.from!;
 
-				console.info('Received week-plan start command', { eventId, jobName, user });
+				console.info('Received week-plan start command', { type, date, jobKey, user });
 
-				const eventProps = await weekPlanApi.getEventsProps(eventId);
-				const messageId = parseInt(eventProps.planMessageId ?? '');
-				const assignedJobs: EventPropsJobs = JSON.parse(eventProps.jobs);
-				const assignedJob = assignedJobs[jobName];
-				const [assignedPerson] = assignedJob.persons;
-				const config = configs.find((config) => config.name === eventProps.type);
+				const planEvent = await findPlanEvent(type, date);
+				const job = planEvent?.jobs.find((item) => item.key === jobKey);
+				if (!job) return ctx.reply('This job does not exist anymore.');
 
-				if (assignedPerson && assignedPerson.id !== user.id) {
-					console.info(
-						`Can not sign ${user.first_name} as ${jobName} is already taken by ${assignedPerson.first_name}`
-					);
+				const result = await store.assign(type, date, jobKey, job.slots, user);
+				await this.changed(date);
 
-					await this.updateWeekPlan(messageId);
+				if (result === 'full') {
+					const [assignedPerson] = (await store.getPlan(type, date))[jobKey]?.persons ?? [];
 					return ctx.reply(
-						`This job is already taken by ${assignedPerson.first_name}. If you want to takeover please ask them to remove themself by tapping the button again.`
+						`This job is already taken by ${assignedPerson?.first_name}. If you want to takeover please ask them to remove themself by tapping the button again.`
 					);
 				}
 
-				if (!assignedPerson) {
-					await weekPlanApi.assignToJob(eventProps.type, eventId, assignedJobs, jobName, user);
-				}
-				await this.updateWeekPlan(messageId);
-				await this.sendUserWeekSummary(messageId, user);
+				await this.sendUserWeekSummary(mondayOf(parseDate(date)), user);
 
-				await ctx.reply(`${askDetailsReply(config?.title ?? jobName)}\n\n#${eventId}_${jobName}`, {
+				await ctx.reply(`${askDetailsReply(job.title)}\n\n#${type}_${date}_${jobKey}`, {
 					reply_markup: { force_reply: true }
 				});
 			}
@@ -455,21 +609,24 @@ export class WeekPlanBot {
 				return next();
 			}
 
-			const [, eventId, jobName] = ctx.message.reply_to_message.text.match(/#(\w+)_(\w+)/) ?? [];
-			if (!eventId || !jobName) return next();
-			const eventProps = await weekPlanApi.getEventsProps(eventId);
-			const messageId = parseInt(eventProps.planMessageId ?? '');
-			const assignedJobs: EventPropsJobs = JSON.parse(eventProps.jobs);
-			const details = ctx.message.text;
+			const [, type, date, jobKey] =
+				ctx.message.reply_to_message.text.match(/#([a-z0-9-]+)_(\d{8})_([a-z0-9]+)/) ?? [];
+			if (!type || !date || !jobKey) return next();
 
-			console.info('Save practise', { messageId, eventId, details });
+			console.info('Save practise', { type, date, jobKey, details: ctx.message.text });
 
-			await weekPlanApi.addJobDetails(eventProps.type, eventId, assignedJobs, jobName, details);
-			await this.updateWeekPlan(messageId);
+			await store.setDetails(type, date, jobKey, ctx.message.text);
+			await this.changed(date);
 
 			await ctx.react('👍');
 		});
 	}
+}
+
+/** All-day events over several days ("Fairy of the Week") belong to the whole week; a single all-day event to its day. */
+function isMultiDay(event: CalendarEvent) {
+	if (!event.start?.date || !event.end?.date) return false;
+	return DateTime.fromISO(event.end.date).diff(DateTime.fromISO(event.start.date), 'days').days > 1;
 }
 
 function getEventDate(event: CalendarEvent) {

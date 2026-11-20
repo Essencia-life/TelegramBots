@@ -40,7 +40,7 @@ export class LunchPollBot {
 		const startOfDay = date.startOf('day').toJSDate();
 		const endOfDay = date.endOf('day').toJSDate();
 
-		const events = await calendarByName.community.getEvents(['type=lunch'], startOfDay, endOfDay);
+		const events = await calendarByName.community.getEvents(['type=lunch'], startOfDay, endOfDay, { props: 'private' });
 
 		return events[0];
 	}
