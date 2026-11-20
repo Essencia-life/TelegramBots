@@ -1,13 +1,18 @@
 import { BOT_HOME_GROUP_CHAT_ID, VERCEL_BRANCH_URL } from '$env/static/private';
-import { GrammyError, InlineKeyboard, type Bot } from 'grammy';
+import { GrammyError, type Bot } from 'grammy';
 import { type CalendarEvent } from '$lib/server/calendar';
 import * as store from '../plan-store';
 import type { Plan } from '../plan-store';
 import { DateTime } from 'luxon';
 import { calendarByName, dateKey, toPlanEvent, type PlanEvent } from '../week-plan-api';
-import { formatTelegramUsers } from './weekPlan';
 import topics from '../utils/topics';
-import type { InlineKeyboardMarkup } from 'grammy/types';
+import type {
+	InputRichBlock,
+	InputRichMessage,
+	RichMessageButton,
+	RichText
+} from 'grammy/types';
+import type { TelegramUser } from '../users';
 
 const timeZone = 'Europe/Lisbon';
 
@@ -20,17 +25,11 @@ export class AgendaBot {
 
 		if (events.length) {
 			const plans = await getPlans(events);
-			const text = formatAgenda(tomorrow.toJSDate(), events, plans);
-			const keyboard = generateAvailableJobButtons(events, plans);
-
-			const message = await this.bot.api.sendMessage(BOT_HOME_GROUP_CHAT_ID, text, {
-				parse_mode: 'HTML',
-				reply_markup: keyboard,
-				message_thread_id: topics.dailyInfo,
-				link_preview_options: {
-					is_disabled: true
-				}
-			});
+			const message = await this.bot.api.sendRichMessage(
+				BOT_HOME_GROUP_CHAT_ID,
+				buildAgenda(tomorrow, events, plans),
+				{ message_thread_id: topics.dailyInfo }
+			);
 
 			await store.setMessageId('agenda', dateKey(tomorrow), message.message_id);
 			await this.watchCalendar(tomorrow, message.message_id);
@@ -44,19 +43,15 @@ export class AgendaBot {
 
 		const events = await this.getEventsByDate(date);
 		const plans = await getPlans(events);
-		const text = formatAgenda(date.toJSDate(), events, plans);
-		const keyboard = generateAvailableJobButtons(events, plans);
 
 		try {
-			await this.bot.api.editMessageText(BOT_HOME_GROUP_CHAT_ID, messageId, text, {
-				parse_mode: 'HTML',
-				reply_markup: keyboard,
-				link_preview_options: {
-					is_disabled: true
-				}
-			});
+			await this.bot.api.editMessageText(
+				BOT_HOME_GROUP_CHAT_ID,
+				messageId,
+				buildAgenda(date, events, plans)
+			);
 		} catch (err) {
-			// nothing changed for the agenda (e.g. another event of that calendar was edited): Telegram answers 400
+			// two updates within the same second render the same footer, Telegram answers 400
 			if (!(err instanceof GrammyError) || !/message is not modified/i.test(err.description)) console.error(err);
 		}
 	}
@@ -96,14 +91,20 @@ export class AgendaBot {
 	}
 }
 
-function transformDescription(description: string): string {
-	return (
-		'\n' +
-		description
-			.replaceAll(/<(br|\/li|\/ul)>/g, '\n')
-			.replaceAll('<li>', '• ')
-			.replaceAll('<ul>', '')
-	);
+/** Google descriptions are HTML: lists and line breaks become lines, other tags are dropped (links are lost) */
+function descriptionLines(description: string) {
+	return description
+		.replaceAll(/<(br|\/li|\/ul)>/g, '\n')
+		.replaceAll('<li>', '• ')
+		.replaceAll(/<[^>]+>/g, '')
+		.replaceAll('&nbsp;', ' ')
+		.replaceAll('&lt;', '<')
+		.replaceAll('&gt;', '>')
+		.replaceAll('&quot;', '"')
+		.replaceAll('&amp;', '&')
+		.split('\n')
+		.map((line) => line.trim())
+		.filter(Boolean);
 }
 
 /**
@@ -122,10 +123,6 @@ export function parseLocation(location: string) {
 			return room;
 		})
 		.join(', ');
-}
-
-function formatLocation(location?: string | null) {
-	return location ? `<i>\uFE6B${parseLocation(location)}</i>` : '';
 }
 
 function formatDuration(event: CalendarEvent) {
@@ -156,47 +153,71 @@ async function getPlans(events: CalendarEvent[]) {
 
 type Plans = Awaited<ReturnType<typeof getPlans>>;
 
-function formatJobs(planEvent: PlanEvent | undefined, plan: Plan | undefined) {
-	const block: string[] = [];
+function people(persons: TelegramUser[]): RichText[] {
+	if (persons.length === 0) return ['❓️'];
+
+	return persons.flatMap((person, index): RichText[] => {
+		const name: RichText = person.id
+			? { type: 'url', text: person.first_name, url: `tg://user?id=${person.id}` }
+			: person.first_name;
+		if (index === 0) return [name];
+		return [index === persons.length - 1 ? ' & ' : ', ', name];
+	});
+}
+
+function jobBlocks(planEvent: PlanEvent | undefined, plan: Plan | undefined): InputRichBlock[] {
+	const blocks: InputRichBlock[] = [];
 
 	for (const { key, title } of planEvent?.jobs ?? []) {
 		const { persons = [], details } = plan?.[key] ?? {};
 		if (!details) {
-			block.push(`${title}: ${formatTelegramUsers(persons)}`);
+			blocks.push({ type: 'paragraph', text: [`${title}: `, ...people(persons)] });
 		} else {
-			const [firstLine, rest] = details.split('\n', 2);
-			block.push(`${title}: ${firstLine} with ${formatTelegramUsers(persons)}`);
-			if (rest) block.push(rest);
+			const [firstLine, ...rest] = details.split('\n');
+			blocks.push({ type: 'paragraph', text: [`${title}: ${firstLine} with `, ...people(persons)] });
+			blocks.push(...rest.filter(Boolean).map((text): InputRichBlock => ({ type: 'paragraph', text })));
 		}
 	}
 
-	return block.join('\n');
+	return blocks;
 }
 
-function formatEvent(event: CalendarEvent, plans: Plans): string {
-	const firstLine = [event.summary];
+function eventBlocks(event: CalendarEvent, plans: Plans): InputRichBlock[] {
+	const title: RichText[] = [];
 
 	if (event.start?.dateTime) {
 		const time = DateTime.fromISO(event.start.dateTime)
 			.setZone(event.start.timeZone!)
 			.setLocale('en')
-			.toLocaleString({
-				hour12: false,
-				hour: '2-digit',
-				minute: '2-digit'
-			});
-		firstLine.unshift(`<b>${time}</b>`);
-		firstLine.push(formatDuration(event));
+			.toLocaleString({ hour12: false, hour: '2-digit', minute: '2-digit' });
+		title.push({ type: 'bold', text: time }, ' ');
+	}
+	title.push(event.summary ?? '');
+	const duration = formatDuration(event);
+	if (duration) title.push(` ${duration}`);
+
+	const blocks: InputRichBlock[] = [{ type: 'paragraph', text: title }];
+
+	if (event.location) {
+		blocks.push({
+			type: 'paragraph',
+			text: { type: 'italic', text: `\uFE6B${parseLocation(event.location)}` }
+		});
 	}
 
-	const lines = [
-		firstLine.join(' '),
-		formatLocation(event.location),
-		formatJobs(plans.get(event.id!)?.planEvent, plans.get(event.id!)?.plan),
-		transformDescription(event.description ?? '')
-	].filter(Boolean);
+	const entry = plans.get(event.id!);
+	blocks.push(...jobBlocks(entry?.planEvent, entry?.plan));
+	blocks.push(
+		...descriptionLines(event.description ?? '').map(
+			(text): InputRichBlock => ({ type: 'paragraph', text })
+		)
+	);
 
-	return `<blockquote expandable>${lines.join('\n')}</blockquote>`;
+	const sos = sosButtons(event, plans);
+	return [
+		{ type: 'blockquote', blocks },
+		...(sos.length ? [{ type: 'buttons' as const, align: 'left' as const, buttons: sos }] : [])
+	];
 }
 
 function byStartDate(a: CalendarEvent, b: CalendarEvent) {
@@ -205,32 +226,39 @@ function byStartDate(a: CalendarEvent, b: CalendarEvent) {
 	);
 }
 
-function formatAgenda(date: Date, events: CalendarEvent[], plans: Plans) {
-	return `🗓️ <b>Agenda for ${date.toLocaleDateString('en', { weekday: 'long' })}</b>
+function buildAgenda(date: DateTime, events: CalendarEvent[], plans: Plans): InputRichMessage {
+	const blocks: InputRichBlock[] = [
+		{ type: 'heading', size: 1, text: `🗓️ Agenda for ${date.setLocale('en').toFormat('cccc')}` },
+		...events.flatMap((event) => eventBlocks(event, plans))
+	];
 
-${events.map((event) => formatEvent(event, plans)).join('\n\n')}`;
+	blocks.push({
+		type: 'footer',
+		text: {
+			type: 'subscript',
+			text:
+				'Last updated ' +
+				DateTime.now().setZone(timeZone).toLocaleString(DateTime.DATETIME_MED_WITH_SECONDS)
+		}
+	});
+
+	return { blocks };
 }
 
-function generateAvailableJobButtons(events: CalendarEvent[], plans: Plans): InlineKeyboardMarkup {
-	let keyboard = new InlineKeyboard();
+/** open jobs of an event that are marked as urgent (sos) */
+function sosButtons(event: CalendarEvent, plans: Plans) {
+	const entry = plans.get(event.id!);
+	// Skip weekly tasks
+	if (!entry || !event.start?.dateTime) return [];
 
-	for (const event of events) {
-		const entry = plans.get(event.id!);
-		// Skip weekly tasks
-		if (!entry || !event.start?.dateTime) continue;
+	const { type, date, jobs } = entry.planEvent;
+	const weekday = new Date(event.start.dateTime).toLocaleDateString('en', { weekday: 'long' });
 
-		const { type, date, jobs } = entry.planEvent;
-		for (const { key, title, sos } of jobs) {
-			if (sos && !entry.plan[key]?.persons.length) {
-				keyboard = keyboard
-					.row()
-					.text(
-						`🆘 I will do ${title} on ${new Date(event.start.dateTime).toLocaleDateString('en', { weekday: 'long' })}!`,
-						`plan:${type}:${date}:${key}`
-					);
-			}
-		}
-	}
-
-	return keyboard;
+	return jobs
+		.filter(({ key, sos }) => sos && !entry.plan[key]?.persons.length)
+		.map(({ key, title }): RichMessageButton => ({
+			text: `🆘 I will do ${title} on ${weekday}!`,
+			callback_data: `plan:${type}:${date}:${key}`,
+			style: 'danger'
+		}));
 }

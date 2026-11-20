@@ -635,26 +635,6 @@ function getEventDate(event: CalendarEvent) {
 	return DateTime.fromISO(date, { zone: event.start?.timeZone ?? timeZone }).setZone(timeZone);
 }
 
-export function formatTelegramUsers(users: TelegramUser[]) {
-	if (users.length === 0) return '❓️';
-	if (users.length === 1) return formatTelegramUser(users[0]);
-	if (users.length === 2) return users.map(formatTelegramUser).join(' & ');
-
-	return (
-		users.slice(0, -1).map(formatTelegramUser).join(', ') +
-		' & ' +
-		formatTelegramUser(users[users.length - 1])
-	);
-}
-
-function formatTelegramUser(user: TelegramUser) {
-	if (user.id) {
-		return `<a href="tg://user?id=${user.id}">${user.first_name}</a>`;
-	}
-
-	return user.first_name;
-}
-
 function noopTag(strings: TemplateStringsArray, ...values: unknown[]) {
 	return String.raw(strings, ...values);
 }
