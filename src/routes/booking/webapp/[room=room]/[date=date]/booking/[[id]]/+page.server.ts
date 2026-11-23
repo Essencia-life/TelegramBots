@@ -1,0 +1,19 @@
+import { error } from '@sveltejs/kit';
+import type { PageServerLoad } from './$types';
+import { Calendar } from '$lib/server/calendar';
+import { roomOf } from '$lib/server/booking/rooms';
+import { CO_WORKING_CALENDAR_ID } from '$env/static/private';
+
+export const load: PageServerLoad = async ({ params }) => {
+	if (params.id) {
+		const coWorkingCalendar = new Calendar(CO_WORKING_CALENDAR_ID);
+		const booking = await coWorkingCalendar.getEvent(params.id);
+
+		// TODO check if user has permission to view this booking
+		if (!booking || roomOf(booking)?.slug !== params.room) {
+			return error(404, 'Booking not found');
+		}
+
+		return { booking };
+	}
+};
