@@ -182,6 +182,9 @@ function jobBlocks(planEvent: PlanEvent | undefined, plan: Plan | undefined): In
 	return blocks;
 }
 
+/** blank line between the heading and the events and between the events */
+const spacer: InputRichBlock = { type: 'paragraph', text: '\u2800' };
+
 function eventBlocks(event: CalendarEvent, plans: Plans): InputRichBlock[] {
 	const title: RichText[] = [];
 
@@ -215,7 +218,8 @@ function eventBlocks(event: CalendarEvent, plans: Plans): InputRichBlock[] {
 
 	const sos = sosButtons(event, plans);
 	return [
-		{ type: 'blockquote', blocks },
+		// only events with a description have something to fold away
+		{ type: event.description?.trim() ? 'expandable_blockquote' : 'blockquote', blocks },
 		...(sos.length ? [{ type: 'buttons' as const, align: 'left' as const, buttons: sos }] : [])
 	];
 }
@@ -229,7 +233,7 @@ function byStartDate(a: CalendarEvent, b: CalendarEvent) {
 function buildAgenda(date: DateTime, events: CalendarEvent[], plans: Plans): InputRichMessage {
 	const blocks: InputRichBlock[] = [
 		{ type: 'heading', size: 1, text: `🗓️ Agenda for ${date.setLocale('en').toFormat('cccc')}` },
-		...events.flatMap((event) => eventBlocks(event, plans))
+		...events.flatMap((event) => [spacer, ...eventBlocks(event, plans)])
 	];
 
 	blocks.push({
