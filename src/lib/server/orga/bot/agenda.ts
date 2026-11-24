@@ -1,41 +1,40 @@
 import { BOT_HOME_GROUP_CHAT_ID, VERCEL_BRANCH_URL } from '$env/static/private';
-import { GrammyError, InlineKeyboard, type Bot } from 'grammy';
+import { GrammyError, type Bot } from 'grammy';
 import { type CalendarEvent } from '$lib/server/calendar';
 import * as store from '../plan-store';
 import type { Plan } from '../plan-store';
 import { DateTime } from 'luxon';
 import { calendarByName, dateKey, toPlanEvent, type PlanEvent } from '../week-plan-api';
-import { formatTelegramUsers } from './weekPlan';
 import topics from '../utils/topics';
-import type { InlineKeyboardMarkup } from 'grammy/types';
+import type {
+	InputRichBlock,
+	InputRichMessage,
+	RichMessageButton,
+	RichText
+} from 'grammy/types';
+import type { TelegramUser } from '../users';
 
 const timeZone = 'Europe/Lisbon';
 
 export class AgendaBot {
 	constructor(private readonly bot: Bot) {}
 
-	public async sendAgenda() {
-		const tomorrow = DateTime.now().setZone(timeZone).plus({ day: 1 });
-		const events = await this.getEventsByDate(tomorrow);
+	/** Sends the agenda of the given day, by default the one of tomorrow. */
+	public async sendAgenda(date = DateTime.now().setZone(timeZone).plus({ day: 1 })) {
+		const events = await this.getEventsByDate(date);
 
 		if (events.length) {
 			const plans = await getPlans(events);
-			const text = formatAgenda(tomorrow.toJSDate(), events, plans);
-			const keyboard = generateAvailableJobButtons(events, plans);
+			const message = await this.bot.api.sendRichMessage(
+				BOT_HOME_GROUP_CHAT_ID,
+				buildAgenda(date, events, plans),
+				{ message_thread_id: topics.dailyInfo }
+			);
 
-			const message = await this.bot.api.sendMessage(BOT_HOME_GROUP_CHAT_ID, text, {
-				parse_mode: 'HTML',
-				reply_markup: keyboard,
-				message_thread_id: topics.dailyInfo,
-				link_preview_options: {
-					is_disabled: true
-				}
-			});
-
-			await store.setMessageId('agenda', dateKey(tomorrow), message.message_id);
-			await this.watchCalendar(tomorrow, message.message_id);
+			await store.setMessageId('agenda', dateKey(date), message.message_id);
+			await this.watchCalendar(date, message.message_id);
 		} else {
-			console.info('No agenda for today');
+			console.info(`No agenda for ${date.toISODate()}`);
 		}
 	}
 
@@ -44,19 +43,15 @@ export class AgendaBot {
 
 		const events = await this.getEventsByDate(date);
 		const plans = await getPlans(events);
-		const text = formatAgenda(date.toJSDate(), events, plans);
-		const keyboard = generateAvailableJobButtons(events, plans);
 
 		try {
-			await this.bot.api.editMessageText(BOT_HOME_GROUP_CHAT_ID, messageId, text, {
-				parse_mode: 'HTML',
-				reply_markup: keyboard,
-				link_preview_options: {
-					is_disabled: true
-				}
-			});
+			await this.bot.api.editMessageText(
+				BOT_HOME_GROUP_CHAT_ID,
+				messageId,
+				buildAgenda(date, events, plans)
+			);
 		} catch (err) {
-			// nothing changed for the agenda (e.g. another event of that calendar was edited): Telegram answers 400
+			// two updates within the same second render the same footer, Telegram answers 400
 			if (!(err instanceof GrammyError) || !/message is not modified/i.test(err.description)) console.error(err);
 		}
 	}
@@ -96,14 +91,159 @@ export class AgendaBot {
 	}
 }
 
-function transformDescription(description: string): string {
-	return (
-		'\n' +
-		description
-			.replaceAll(/<(br|\/li|\/ul)>/g, '\n')
-			.replaceAll('<li>', '• ')
-			.replaceAll('<ul>', '')
-	);
+const entities: Record<string, string> = { nbsp: ' ', lt: '<', gt: '>', quot: '"', amp: '&', apos: "'" };
+
+function decodeEntities(text: string) {
+	return text.replaceAll(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (match, name: string) => {
+		if (name[0] !== '#') return entities[name.toLowerCase()] ?? match;
+		const code = name[1].toLowerCase() === 'x' ? parseInt(name.slice(2), 16) : parseInt(name.slice(1), 10);
+		return String.fromCodePoint(code);
+	});
+}
+
+const inlineTypes: Record<string, 'bold' | 'italic' | 'underline' | 'strikethrough'> = {
+	b: 'bold',
+	strong: 'bold',
+	i: 'italic',
+	em: 'italic',
+	u: 'underline',
+	s: 'strikethrough',
+	strike: 'strikethrough',
+	del: 'strikethrough'
+};
+
+const lineBreakTags = new Set(['br', 'p', 'div', 'li', 'ul', 'ol', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']);
+
+type Frame = { tag: string; url?: string; children: RichText[] };
+
+function wrap({ tag, url, children }: Frame): RichText {
+	if (tag === 'a' && url) return { type: 'url', text: children, url };
+	return tag in inlineTypes ? { type: inlineTypes[tag], text: children } : children;
+}
+
+type ListInfo = { id: number; ordered: boolean };
+/** list: the lists the line belongs to as a list item, outermost first */
+type DescriptionLine = { content: RichText[]; list?: ListInfo[] };
+
+/**
+ * Google descriptions are HTML: bold, italic, underline, strikethrough and links are kept, line breaks become lines,
+ * list items are marked with their list, other tags are dropped.
+ */
+export function descriptionLines(description: string): DescriptionLine[] {
+	const stack: Frame[] = [{ tag: '', children: [] }];
+	const lists: ListInfo[] = [];
+	let listCount = 0;
+	/** the open list items: the lists they are in */
+	const items: ListInfo[][] = [];
+	const lines: DescriptionLine[] = [];
+
+	const endLine = () => {
+		// open formatting is closed and reopened, so a line break inside <b> keeps both lines bold
+		for (let i = stack.length - 1; i > 0; i--) stack[i - 1].children.push(wrap(stack[i]));
+		const children = stack[0].children;
+		for (const frame of stack) frame.children = [];
+
+		if (typeof children[0] === 'string') children[0] = children[0].trimStart();
+		if (typeof children.at(-1) === 'string') children[children.length - 1] = (children.at(-1) as string).trimEnd();
+
+		const content = children.filter((child) => child !== '');
+		if (content.length) lines.push({ content, list: items.at(-1) });
+	};
+
+	for (const [token] of description.matchAll(/<\/?[a-z][^>]*>|<|[^<]+/gi)) {
+		if (!token.startsWith('<') || token === '<') {
+			const text = decodeEntities(token).replaceAll(/\s+/g, ' ');
+			if (text) stack.at(-1)!.children.push(text);
+			continue;
+		}
+
+		const closing = token[1] === '/';
+		const tag = token.match(/^<\/?([a-z][a-z0-9]*)/i)![1].toLowerCase();
+
+		if (lineBreakTags.has(tag)) endLine();
+
+		if (closing) {
+			if (tag === 'li') items.pop();
+			if (tag === 'ul' || tag === 'ol') lists.pop();
+			const open = stack.findLastIndex((frame) => frame.tag === tag);
+			// formatting tags that were never closed or closed out of order are ignored
+			if (open > 0 && (tag === 'a' || tag in inlineTypes)) {
+				for (let i = stack.length - 1; i >= open; i--) stack[i - 1].children.push(wrap(stack[i]));
+				stack.length = open;
+			}
+		} else if (tag === 'ul' || tag === 'ol') {
+			lists.push({ id: ++listCount, ordered: tag === 'ol' });
+		} else if (tag === 'li') {
+			items.push([...lists]);
+		} else if (tag === 'a') {
+			const href = decodeEntities(token.match(/href\s*=\s*(?:"([^"]*)"|'([^']*)')/i)?.slice(1).find(Boolean) ?? '');
+			stack.push({ tag, url: /^(https?:|mailto:|tel:)/i.test(href) ? href : undefined, children: [] });
+		} else if (tag in inlineTypes) {
+			stack.push({ tag, children: [] });
+		}
+	}
+
+	endLine();
+	return lines;
+}
+
+type ListBlock = Extract<InputRichBlock, { type: 'list' }>;
+
+/** lines of the description as blocks: consecutive lines form a paragraph, list items form a (nested) list */
+function descriptionBlocks(description: string): InputRichBlock[] {
+	const blocks: InputRichBlock[] = [];
+	let paragraph: RichText[] = [];
+	/** the open lists, outermost first */
+	let open: { id: number; block: ListBlock }[] = [];
+
+	const endParagraph = () => {
+		if (paragraph.length) blocks.push({ type: 'paragraph', text: joinLines(paragraph) });
+		paragraph = [];
+	};
+
+	for (const { content, list } of descriptionLines(description)) {
+		if (!list) {
+			open = [];
+			paragraph.push(content);
+			continue;
+		}
+
+		endParagraph();
+
+		// keep the open lists this item is in, close the others
+		let depth = 0;
+		while (depth < open.length && depth < list.length && open[depth].id === list[depth].id) depth++;
+		open.length = depth;
+
+		for (; depth < list.length; depth++) {
+			const block: ListBlock = { type: 'list', items: [] };
+			if (depth === 0) {
+				blocks.push(block);
+			} else {
+				// a nested list is part of the item above it, even if that item has no text of its own
+				const parent = open[depth - 1].block;
+				if (!parent.items.length) {
+					parent.items.push({ blocks: [], ...(list[depth - 1].ordered && { type: '1' as const, value: 1 }) });
+				}
+				parent.items.at(-1)!.blocks.push(block);
+			}
+			open.push({ id: list[depth].id, block });
+		}
+
+		const { block } = open.at(-1)!;
+		block.items.push({
+			blocks: [{ type: 'paragraph', text: content }],
+			...(list.at(-1)!.ordered && { type: '1' as const, value: block.items.length + 1 })
+		});
+	}
+
+	endParagraph();
+	return blocks;
+}
+
+/** lines below each other inside one paragraph */
+function joinLines(lines: RichText[]): RichText[] {
+	return lines.flatMap((line, i) => (i ? ['\n', line] : [line]));
 }
 
 /**
@@ -122,10 +262,6 @@ export function parseLocation(location: string) {
 			return room;
 		})
 		.join(', ');
-}
-
-function formatLocation(location?: string | null) {
-	return location ? `<i>\uFE6B${parseLocation(location)}</i>` : '';
 }
 
 function formatDuration(event: CalendarEvent) {
@@ -156,47 +292,82 @@ async function getPlans(events: CalendarEvent[]) {
 
 type Plans = Awaited<ReturnType<typeof getPlans>>;
 
-function formatJobs(planEvent: PlanEvent | undefined, plan: Plan | undefined) {
-	const block: string[] = [];
+function people(persons: TelegramUser[]): RichText[] {
+	if (persons.length === 0) return ['❓️'];
+
+	return persons.flatMap((person, index): RichText[] => {
+		const name: RichText = person.id
+			? { type: 'url', text: person.first_name, url: `tg://user?id=${person.id}` }
+			: person.first_name;
+		if (index === 0) return [name];
+		return [index === persons.length - 1 ? ' & ' : ', ', name];
+	});
+}
+
+/** one entry per line, the lines of a job with details follow directly */
+function jobLines(planEvent: PlanEvent | undefined, plan: Plan | undefined): RichText[] {
+	const lines: RichText[] = [];
 
 	for (const { key, title } of planEvent?.jobs ?? []) {
 		const { persons = [], details } = plan?.[key] ?? {};
 		if (!details) {
-			block.push(`${title}: ${formatTelegramUsers(persons)}`);
+			lines.push([`${title}: `, ...people(persons)]);
 		} else {
-			const [firstLine, rest] = details.split('\n', 2);
-			block.push(`${title}: ${firstLine} with ${formatTelegramUsers(persons)}`);
-			if (rest) block.push(rest);
+			const [firstLine, ...rest] = details.split('\n');
+			lines.push([`${title}: ${firstLine} with `, ...people(persons)]);
+			lines.push(...rest.filter(Boolean));
 		}
 	}
 
-	return block.join('\n');
+	return lines;
 }
 
-function formatEvent(event: CalendarEvent, plans: Plans): string {
-	const firstLine = [event.summary];
+/** small blank line between the heading, the events and the footer (a footer block is smaller than a paragraph) */
+const spacer: InputRichBlock = { type: 'footer', text: '\u2800' };
+
+function eventBlocks(event: CalendarEvent, plans: Plans): InputRichBlock[] {
+	// paragraphs: time and location / title and duration / jobs / description
+	const firstLine: RichText[] = [];
 
 	if (event.start?.dateTime) {
-		const time = DateTime.fromISO(event.start.dateTime)
-			.setZone(event.start.timeZone!)
-			.setLocale('en')
-			.toLocaleString({
-				hour12: false,
-				hour: '2-digit',
-				minute: '2-digit'
-			});
-		firstLine.unshift(`<b>${time}</b>`);
-		firstLine.push(formatDuration(event));
+		const start = DateTime.fromISO(event.start.dateTime);
+		firstLine.push({
+			type: 'date_time',
+			text: start
+				.setZone(event.start.timeZone!)
+				.setLocale('en')
+				.toLocaleString({ hour12: false, hour: '2-digit', minute: '2-digit' }),
+			unix_time: start.toUnixInteger(),
+			date_time_format: 't'
+		});
+	}
+	if (event.location) {
+		if (firstLine.length) firstLine.push(' ');
+		firstLine.push({ type: 'italic', text: `\uFE6B${parseLocation(event.location)}` });
 	}
 
-	const lines = [
-		firstLine.join(' '),
-		formatLocation(event.location),
-		formatJobs(plans.get(event.id!)?.planEvent, plans.get(event.id!)?.plan),
-		transformDescription(event.description ?? '')
-	].filter(Boolean);
+	const secondLine: RichText[] = [event.summary ?? ''];
+	const duration = formatDuration(event);
+	if (duration) secondLine.push(` ${duration}`);
 
-	return `<blockquote expandable>${lines.join('\n')}</blockquote>`;
+	const entry = plans.get(event.id!);
+
+	// a paragraph per group with line breaks inside: a paragraph per line would get the wide block spacing
+	const blocks: InputRichBlock[] = [
+		firstLine.length ? [firstLine] : [],
+		[secondLine],
+		jobLines(entry?.planEvent, entry?.plan)
+	]
+		.filter((lines) => lines.length)
+		.map((lines): InputRichBlock => ({ type: 'paragraph', text: joinLines(lines) }));
+	blocks.push(...descriptionBlocks(event.description ?? ''));
+
+	const sos = sosButtons(event, plans);
+	return [
+		// only events with a description have something to fold away
+		{ type: event.description?.trim() ? 'expandable_blockquote' : 'blockquote', blocks },
+		...(sos.length ? [{ type: 'buttons' as const, align: 'left' as const, buttons: sos }] : [])
+	];
 }
 
 function byStartDate(a: CalendarEvent, b: CalendarEvent) {
@@ -205,32 +376,39 @@ function byStartDate(a: CalendarEvent, b: CalendarEvent) {
 	);
 }
 
-function formatAgenda(date: Date, events: CalendarEvent[], plans: Plans) {
-	return `🗓️ <b>Agenda for ${date.toLocaleDateString('en', { weekday: 'long' })}</b>
+function buildAgenda(date: DateTime, events: CalendarEvent[], plans: Plans): InputRichMessage {
+	const blocks: InputRichBlock[] = [
+		{ type: 'heading', size: 1, text: `🗓️ Agenda for ${date.setLocale('en').toFormat('cccc')}` },
+		...events.flatMap((event) => [spacer, ...eventBlocks(event, plans)])
+	];
 
-${events.map((event) => formatEvent(event, plans)).join('\n\n')}`;
+	blocks.push(spacer, {
+		type: 'footer',
+		text: {
+			type: 'subscript',
+			text:
+				'Last updated ' +
+				DateTime.now().setZone(timeZone).toLocaleString(DateTime.DATETIME_MED_WITH_SECONDS)
+		}
+	});
+
+	return { blocks };
 }
 
-function generateAvailableJobButtons(events: CalendarEvent[], plans: Plans): InlineKeyboardMarkup {
-	let keyboard = new InlineKeyboard();
+/** open jobs of an event that are marked as urgent (sos) */
+function sosButtons(event: CalendarEvent, plans: Plans) {
+	const entry = plans.get(event.id!);
+	// Skip weekly tasks
+	if (!entry || !event.start?.dateTime) return [];
 
-	for (const event of events) {
-		const entry = plans.get(event.id!);
-		// Skip weekly tasks
-		if (!entry || !event.start?.dateTime) continue;
+	const { type, date, jobs } = entry.planEvent;
+	const weekday = new Date(event.start.dateTime).toLocaleDateString('en', { weekday: 'long' });
 
-		const { type, date, jobs } = entry.planEvent;
-		for (const { key, title, sos } of jobs) {
-			if (sos && !entry.plan[key]?.persons.length) {
-				keyboard = keyboard
-					.row()
-					.text(
-						`🆘 I will do ${title} on ${new Date(event.start.dateTime).toLocaleDateString('en', { weekday: 'long' })}!`,
-						`plan:${type}:${date}:${key}`
-					);
-			}
-		}
-	}
-
-	return keyboard;
+	return jobs
+		.filter(({ key, sos }) => sos && !entry.plan[key]?.persons.length)
+		.map(({ key, title }): RichMessageButton => ({
+			text: `🆘 I will do ${title} on ${weekday}!`,
+			callback_data: `plan:${type}:${date}:${key}`,
+			style: 'danger'
+		}));
 }
