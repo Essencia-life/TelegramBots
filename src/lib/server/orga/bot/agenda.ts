@@ -121,7 +121,9 @@ function wrap({ tag, url, children }: Frame): RichText {
 	return tag in inlineTypes ? { type: inlineTypes[tag], text: children } : children;
 }
 
-type DescriptionLine = { content: RichText[]; list?: { id: number; ordered: boolean } };
+type ListInfo = { id: number; ordered: boolean };
+/** list: the lists the line belongs to as a list item, outermost first */
+type DescriptionLine = { content: RichText[]; list?: ListInfo[] };
 
 /**
  * Google descriptions are HTML: bold, italic, underline, strikethrough and links are kept, line breaks become lines,
@@ -129,9 +131,10 @@ type DescriptionLine = { content: RichText[]; list?: { id: number; ordered: bool
  */
 export function descriptionLines(description: string): DescriptionLine[] {
 	const stack: Frame[] = [{ tag: '', children: [] }];
-	const lists: { id: number; ordered: boolean }[] = [];
+	const lists: ListInfo[] = [];
 	let listCount = 0;
-	let item: DescriptionLine['list'];
+	/** the open list items: the lists they are in */
+	const items: ListInfo[][] = [];
 	const lines: DescriptionLine[] = [];
 
 	const endLine = () => {
@@ -144,7 +147,7 @@ export function descriptionLines(description: string): DescriptionLine[] {
 		if (typeof children.at(-1) === 'string') children[children.length - 1] = (children.at(-1) as string).trimEnd();
 
 		const content = children.filter((child) => child !== '');
-		if (content.length) lines.push({ content, list: item });
+		if (content.length) lines.push({ content, list: items.at(-1) });
 	};
 
 	for (const [token] of description.matchAll(/<\/?[a-z][^>]*>|<|[^<]+/gi)) {
@@ -160,7 +163,7 @@ export function descriptionLines(description: string): DescriptionLine[] {
 		if (lineBreakTags.has(tag)) endLine();
 
 		if (closing) {
-			if (tag === 'li') item = undefined;
+			if (tag === 'li') items.pop();
 			if (tag === 'ul' || tag === 'ol') lists.pop();
 			const open = stack.findLastIndex((frame) => frame.tag === tag);
 			// formatting tags that were never closed or closed out of order are ignored
@@ -171,7 +174,7 @@ export function descriptionLines(description: string): DescriptionLine[] {
 		} else if (tag === 'ul' || tag === 'ol') {
 			lists.push({ id: ++listCount, ordered: tag === 'ol' });
 		} else if (tag === 'li') {
-			item = lists.at(-1);
+			items.push([...lists]);
 		} else if (tag === 'a') {
 			const href = decodeEntities(token.match(/href\s*=\s*(?:"([^"]*)"|'([^']*)')/i)?.slice(1).find(Boolean) ?? '');
 			stack.push({ tag, url: /^(https?:|mailto:|tel:)/i.test(href) ? href : undefined, children: [] });
@@ -184,11 +187,14 @@ export function descriptionLines(description: string): DescriptionLine[] {
 	return lines;
 }
 
-/** lines of the description as blocks: consecutive lines form a paragraph, list items form a list */
+type ListBlock = Extract<InputRichBlock, { type: 'list' }>;
+
+/** lines of the description as blocks: consecutive lines form a paragraph, list items form a (nested) list */
 function descriptionBlocks(description: string): InputRichBlock[] {
 	const blocks: InputRichBlock[] = [];
 	let paragraph: RichText[] = [];
-	let listId: number | undefined;
+	/** the open lists, outermost first */
+	let open: { id: number; block: ListBlock }[] = [];
 
 	const endParagraph = () => {
 		if (paragraph.length) blocks.push({ type: 'paragraph', text: joinLines(paragraph) });
@@ -197,23 +203,37 @@ function descriptionBlocks(description: string): InputRichBlock[] {
 
 	for (const { content, list } of descriptionLines(description)) {
 		if (!list) {
-			listId = undefined;
+			open = [];
 			paragraph.push(content);
 			continue;
 		}
 
 		endParagraph();
-		const last = blocks.at(-1);
-		let listBlock = listId === list.id && last?.type === 'list' ? last : undefined;
-		if (!listBlock) {
-			listBlock = { type: 'list', items: [] };
-			blocks.push(listBlock);
-			listId = list.id;
+
+		// keep the open lists this item is in, close the others
+		let depth = 0;
+		while (depth < open.length && depth < list.length && open[depth].id === list[depth].id) depth++;
+		open.length = depth;
+
+		for (; depth < list.length; depth++) {
+			const block: ListBlock = { type: 'list', items: [] };
+			if (depth === 0) {
+				blocks.push(block);
+			} else {
+				// a nested list is part of the item above it, even if that item has no text of its own
+				const parent = open[depth - 1].block;
+				if (!parent.items.length) {
+					parent.items.push({ blocks: [], ...(list[depth - 1].ordered && { type: '1' as const, value: 1 }) });
+				}
+				parent.items.at(-1)!.blocks.push(block);
+			}
+			open.push({ id: list[depth].id, block });
 		}
 
-		listBlock.items.push({
+		const { block } = open.at(-1)!;
+		block.items.push({
 			blocks: [{ type: 'paragraph', text: content }],
-			...(list.ordered && { type: '1' as const, value: listBlock.items.length + 1 })
+			...(list.at(-1)!.ordered && { type: '1' as const, value: block.items.length + 1 })
 		});
 	}
 
