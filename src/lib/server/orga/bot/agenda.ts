@@ -91,20 +91,93 @@ export class AgendaBot {
 	}
 }
 
-/** Google descriptions are HTML: lists and line breaks become lines, other tags are dropped (links are lost) */
-function descriptionLines(description: string) {
-	return description
-		.replaceAll(/<(br|\/li|\/ul)>/g, '\n')
-		.replaceAll('<li>', '• ')
-		.replaceAll('&nbsp;', ' ')
-		.replaceAll('&lt;', '<')
-		.replaceAll('&gt;', '>')
-		.replaceAll('&quot;', '"')
-		.replaceAll('&amp;', '&')
-		.replaceAll(/<[^>]+>/g, '')
-		.split('\n')
-		.map((line) => line.trim())
-		.filter(Boolean);
+const entities: Record<string, string> = { nbsp: ' ', lt: '<', gt: '>', quot: '"', amp: '&', apos: "'" };
+
+function decodeEntities(text: string) {
+	return text.replaceAll(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (match, name: string) => {
+		if (name[0] !== '#') return entities[name.toLowerCase()] ?? match;
+		const code = name[1].toLowerCase() === 'x' ? parseInt(name.slice(2), 16) : parseInt(name.slice(1), 10);
+		return String.fromCodePoint(code);
+	});
+}
+
+const inlineTypes: Record<string, 'bold' | 'italic' | 'underline' | 'strikethrough'> = {
+	b: 'bold',
+	strong: 'bold',
+	i: 'italic',
+	em: 'italic',
+	u: 'underline',
+	s: 'strikethrough',
+	strike: 'strikethrough',
+	del: 'strikethrough'
+};
+
+const lineBreakTags = new Set(['br', 'p', 'div', 'li', 'ul', 'ol', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']);
+
+type Frame = { tag: string; url?: string; children: RichText[] };
+
+function wrap({ tag, url, children }: Frame): RichText {
+	if (tag === 'a' && url) return { type: 'url', text: children, url };
+	return tag in inlineTypes ? { type: inlineTypes[tag], text: children } : children;
+}
+
+/**
+ * Google descriptions are HTML: bold, italic, underline, strikethrough and links are kept, lists and line breaks become
+ * lines, other tags are dropped. Every line is a RichText.
+ */
+export function descriptionLines(description: string): RichText[] {
+	const stack: Frame[] = [{ tag: '', children: [] }];
+	const lists: { ordered: boolean; n: number }[] = [];
+	const lines: RichText[] = [];
+
+	const endLine = () => {
+		// open formatting is closed and reopened, so a line break inside <b> keeps both lines bold
+		for (let i = stack.length - 1; i > 0; i--) stack[i - 1].children.push(wrap(stack[i]));
+		const children = stack[0].children;
+		for (const frame of stack) frame.children = [];
+
+		if (typeof children[0] === 'string') children[0] = children[0].trimStart();
+		if (typeof children.at(-1) === 'string') children[children.length - 1] = (children.at(-1) as string).trimEnd();
+
+		const content = children.filter((child) => child !== '');
+		if (content.length) lines.push(content);
+	};
+
+	for (const [token] of description.matchAll(/<\/?[a-z][^>]*>|<|[^<]+/gi)) {
+		if (!token.startsWith('<') || token === '<') {
+			const text = decodeEntities(token).replaceAll(/\s+/g, ' ');
+			if (text) stack.at(-1)!.children.push(text);
+			continue;
+		}
+
+		const closing = token[1] === '/';
+		const tag = token.match(/^<\/?([a-z][a-z0-9]*)/i)![1].toLowerCase();
+
+		if (lineBreakTags.has(tag)) endLine();
+
+		if (closing) {
+			if (tag === 'ul' || tag === 'ol') lists.pop();
+			const open = stack.findLastIndex((frame) => frame.tag === tag);
+			// formatting tags that were never closed or closed out of order are ignored
+			if (open > 0 && (tag === 'a' || tag in inlineTypes)) {
+				for (let i = stack.length - 1; i >= open; i--) stack[i - 1].children.push(wrap(stack[i]));
+				stack.length = open;
+			}
+		} else if (tag === 'ul' || tag === 'ol') {
+			lists.push({ ordered: tag === 'ol', n: 0 });
+		} else if (tag === 'li') {
+			const list = lists.at(-1);
+			stack.at(-1)!.children.push(list?.ordered ? `${++list.n}. ` : '• ');
+		} else if (tag === 'a') {
+			const href = decodeEntities(token.match(/href\s*=\s*(?:"([^"]*)"|'([^']*)')/i)?.slice(1).find(Boolean) ?? '');
+			stack.push({ tag, url: /^(https?:|mailto:|tel:)/i.test(href) ? href : undefined, children: [] });
+		} else if (tag in inlineTypes) {
+			stack.push({ tag, children: [] });
+		}
+	}
+
+	endLine();
+	return lines;
 }
 
 /**
