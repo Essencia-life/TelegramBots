@@ -182,8 +182,8 @@ function jobBlocks(planEvent: PlanEvent | undefined, plan: Plan | undefined): In
 	return blocks;
 }
 
-/** blank line between the heading and the events and between the events */
-const spacer: InputRichBlock = { type: 'paragraph', text: '\u2800' };
+/** small blank line (subscript shrinks the font) between the heading and the events and between the events */
+const spacer: InputRichBlock = { type: 'paragraph', text: { type: 'subscript', text: '\u2800' } };
 
 function eventBlocks(event: CalendarEvent, plans: Plans): InputRichBlock[] {
 	const title: RichText[] = [];
