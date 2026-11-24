@@ -165,56 +165,66 @@ function people(persons: TelegramUser[]): RichText[] {
 	});
 }
 
-function jobBlocks(planEvent: PlanEvent | undefined, plan: Plan | undefined): InputRichBlock[] {
-	const blocks: InputRichBlock[] = [];
+/** one entry per line, the lines of a job with details follow directly */
+function jobLines(planEvent: PlanEvent | undefined, plan: Plan | undefined): RichText[] {
+	const lines: RichText[] = [];
 
 	for (const { key, title } of planEvent?.jobs ?? []) {
 		const { persons = [], details } = plan?.[key] ?? {};
 		if (!details) {
-			blocks.push({ type: 'paragraph', text: [`${title}: `, ...people(persons)] });
+			lines.push([`${title}: `, ...people(persons)]);
 		} else {
 			const [firstLine, ...rest] = details.split('\n');
-			blocks.push({ type: 'paragraph', text: [`${title}: ${firstLine} with `, ...people(persons)] });
-			blocks.push(...rest.filter(Boolean).map((text): InputRichBlock => ({ type: 'paragraph', text })));
+			lines.push([`${title}: ${firstLine} with `, ...people(persons)]);
+			lines.push(...rest.filter(Boolean));
 		}
 	}
 
-	return blocks;
+	return lines;
 }
 
-/** small blank line (subscript shrinks the font) between the heading and the events and between the events */
-const spacer: InputRichBlock = { type: 'paragraph', text: { type: 'subscript', text: '\u2800' } };
+/** small blank line between the heading, the events and the footer (a footer block is smaller than a paragraph) */
+const spacer: InputRichBlock = { type: 'footer', text: '\u2800' };
 
 function eventBlocks(event: CalendarEvent, plans: Plans): InputRichBlock[] {
 	const title: RichText[] = [];
 
 	if (event.start?.dateTime) {
-		const time = DateTime.fromISO(event.start.dateTime)
-			.setZone(event.start.timeZone!)
-			.setLocale('en')
-			.toLocaleString({ hour12: false, hour: '2-digit', minute: '2-digit' });
-		title.push({ type: 'bold', text: time }, ' ');
+		const start = DateTime.fromISO(event.start.dateTime);
+		title.push(
+			{
+				type: 'bold',
+				text: {
+					type: 'date_time',
+					text: start
+						.setZone(event.start.timeZone!)
+						.setLocale('en')
+						.toLocaleString({ hour12: false, hour: '2-digit', minute: '2-digit' }),
+					unix_time: start.toUnixInteger(),
+					date_time_format: 't'
+				}
+			},
+			' '
+		);
 	}
 	title.push(event.summary ?? '');
 	const duration = formatDuration(event);
 	if (duration) title.push(` ${duration}`);
 
-	const blocks: InputRichBlock[] = [{ type: 'paragraph', text: title }];
+	const lines: RichText[] = [title];
 
 	if (event.location) {
-		blocks.push({
-			type: 'paragraph',
-			text: { type: 'italic', text: `\uFE6B${parseLocation(event.location)}` }
-		});
+		lines.push({ type: 'italic', text: `\uFE6B${parseLocation(event.location)}` });
 	}
 
 	const entry = plans.get(event.id!);
-	blocks.push(...jobBlocks(entry?.planEvent, entry?.plan));
-	blocks.push(
-		...descriptionLines(event.description ?? '').map(
-			(text): InputRichBlock => ({ type: 'paragraph', text })
-		)
-	);
+	lines.push(...jobLines(entry?.planEvent, entry?.plan));
+	lines.push(...descriptionLines(event.description ?? ''));
+
+	// a single paragraph with line breaks: separate paragraphs would get the wide block spacing
+	const blocks: InputRichBlock[] = [
+		{ type: 'paragraph', text: lines.flatMap((line, i) => (i ? ['\n', line] : [line])) }
+	];
 
 	const sos = sosButtons(event, plans);
 	return [
@@ -236,7 +246,7 @@ function buildAgenda(date: DateTime, events: CalendarEvent[], plans: Plans): Inp
 		...events.flatMap((event) => [spacer, ...eventBlocks(event, plans)])
 	];
 
-	blocks.push({
+	blocks.push(spacer, {
 		type: 'footer',
 		text: {
 			type: 'subscript',
