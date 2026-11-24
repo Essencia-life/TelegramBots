@@ -1,12 +1,18 @@
 import { error, type RequestHandler } from '@sveltejs/kit';
 import { agendaBot } from '$lib/server/orga/bot';
+import { dev } from '$app/environment';
 import { DateTime } from 'luxon';
 
 const timeZone = 'Europe/Lisbon';
 
-/** `?date=YYYY-MM-DD` sends the agenda of that day instead of tomorrow's */
+/** `?date=YYYY-MM-DD` sends the agenda of that day instead of tomorrow's, only in dev */
 export const GET: RequestHandler = async ({ url }) => {
 	const param = url.searchParams.get('date');
+
+	if (param && !dev) {
+		return error(403, 'The date parameter is only available in dev');
+	}
+
 	const date = param ? DateTime.fromISO(param, { zone: timeZone }) : undefined;
 
 	if (param && (!/^\d{4}-\d{2}-\d{2}$/.test(param) || !date?.isValid)) {
