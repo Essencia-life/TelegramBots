@@ -187,7 +187,7 @@ function jobLines(planEvent: PlanEvent | undefined, plan: Plan | undefined): Ric
 const spacer: InputRichBlock = { type: 'footer', text: '\u2800' };
 
 function eventBlocks(event: CalendarEvent, plans: Plans): InputRichBlock[] {
-	// first line: time and location, second line: title and duration
+	// paragraphs: time and location / title and duration / jobs / description
 	const firstLine: RichText[] = [];
 
 	if (event.start?.dateTime) {
@@ -211,14 +211,12 @@ function eventBlocks(event: CalendarEvent, plans: Plans): InputRichBlock[] {
 	const duration = formatDuration(event);
 	if (duration) secondLine.push(` ${duration}`);
 
-	// groups of lines: time and location, title and duration / jobs / description
-	const header: RichText[] = firstLine.length ? [firstLine, secondLine] : [secondLine];
-
 	const entry = plans.get(event.id!);
 
 	// a paragraph per group with line breaks inside: a paragraph per line would get the wide block spacing
 	const blocks: InputRichBlock[] = [
-		header,
+		firstLine.length ? [firstLine] : [],
+		[secondLine],
 		jobLines(entry?.planEvent, entry?.plan),
 		descriptionLines(event.description ?? '')
 	]
