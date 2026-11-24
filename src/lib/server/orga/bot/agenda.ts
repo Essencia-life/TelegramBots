@@ -19,22 +19,22 @@ const timeZone = 'Europe/Lisbon';
 export class AgendaBot {
 	constructor(private readonly bot: Bot) {}
 
-	public async sendAgenda() {
-		const tomorrow = DateTime.now().setZone(timeZone).plus({ day: 1 });
-		const events = await this.getEventsByDate(tomorrow);
+	/** Sends the agenda of the given day, by default the one of tomorrow. */
+	public async sendAgenda(date = DateTime.now().setZone(timeZone).plus({ day: 1 })) {
+		const events = await this.getEventsByDate(date);
 
 		if (events.length) {
 			const plans = await getPlans(events);
 			const message = await this.bot.api.sendRichMessage(
 				BOT_HOME_GROUP_CHAT_ID,
-				buildAgenda(tomorrow, events, plans),
+				buildAgenda(date, events, plans),
 				{ message_thread_id: topics.dailyInfo }
 			);
 
-			await store.setMessageId('agenda', dateKey(tomorrow), message.message_id);
-			await this.watchCalendar(tomorrow, message.message_id);
+			await store.setMessageId('agenda', dateKey(date), message.message_id);
+			await this.watchCalendar(date, message.message_id);
 		} else {
-			console.info('No agenda for today');
+			console.info(`No agenda for ${date.toISODate()}`);
 		}
 	}
 
