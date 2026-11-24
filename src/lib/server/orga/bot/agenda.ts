@@ -187,35 +187,32 @@ function jobLines(planEvent: PlanEvent | undefined, plan: Plan | undefined): Ric
 const spacer: InputRichBlock = { type: 'footer', text: '\u2800' };
 
 function eventBlocks(event: CalendarEvent, plans: Plans): InputRichBlock[] {
-	const title: RichText[] = [];
+	// first line: time and location, second line: title and duration
+	const firstLine: RichText[] = [];
 
 	if (event.start?.dateTime) {
 		const start = DateTime.fromISO(event.start.dateTime);
-		title.push(
-			{
-				type: 'bold',
-				text: {
-					type: 'date_time',
-					text: start
-						.setZone(event.start.timeZone!)
-						.setLocale('en')
-						.toLocaleString({ hour12: false, hour: '2-digit', minute: '2-digit' }),
-					unix_time: start.toUnixInteger(),
-					date_time_format: 't'
-				}
-			},
-			' '
-		);
+		firstLine.push({
+			type: 'date_time',
+			text: start
+				.setZone(event.start.timeZone!)
+				.setLocale('en')
+				.toLocaleString({ hour12: false, hour: '2-digit', minute: '2-digit' }),
+			unix_time: start.toUnixInteger(),
+			date_time_format: 't'
+		});
 	}
-	title.push(event.summary ?? '');
-	const duration = formatDuration(event);
-	if (duration) title.push(` ${duration}`);
-
-	// groups of lines: time, title, duration and location / jobs / description
-	const header: RichText[] = [title];
 	if (event.location) {
-		header.push({ type: 'italic', text: `\uFE6B${parseLocation(event.location)}` });
+		if (firstLine.length) firstLine.push(' ');
+		firstLine.push({ type: 'italic', text: `\uFE6B${parseLocation(event.location)}` });
 	}
+
+	const secondLine: RichText[] = [event.summary ?? ''];
+	const duration = formatDuration(event);
+	if (duration) secondLine.push(` ${duration}`);
+
+	// groups of lines: time and location, title and duration / jobs / description
+	const header: RichText[] = firstLine.length ? [firstLine, secondLine] : [secondLine];
 
 	const entry = plans.get(event.id!);
 
