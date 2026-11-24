@@ -211,20 +211,25 @@ function eventBlocks(event: CalendarEvent, plans: Plans): InputRichBlock[] {
 	const duration = formatDuration(event);
 	if (duration) title.push(` ${duration}`);
 
-	const lines: RichText[] = [title];
-
+	// groups of lines: time, title, duration and location / jobs / description
+	const header: RichText[] = [title];
 	if (event.location) {
-		lines.push({ type: 'italic', text: `\uFE6B${parseLocation(event.location)}` });
+		header.push({ type: 'italic', text: `\uFE6B${parseLocation(event.location)}` });
 	}
 
 	const entry = plans.get(event.id!);
-	lines.push(...jobLines(entry?.planEvent, entry?.plan));
-	lines.push(...descriptionLines(event.description ?? ''));
 
-	// a single paragraph with line breaks: separate paragraphs would get the wide block spacing
+	// a paragraph per group with line breaks inside: a paragraph per line would get the wide block spacing
 	const blocks: InputRichBlock[] = [
-		{ type: 'paragraph', text: lines.flatMap((line, i) => (i ? ['\n', line] : [line])) }
-	];
+		header,
+		jobLines(entry?.planEvent, entry?.plan),
+		descriptionLines(event.description ?? '')
+	]
+		.filter((lines) => lines.length)
+		.map((lines): InputRichBlock => ({
+			type: 'paragraph',
+			text: lines.flatMap((line, i) => (i ? ['\n', line] : [line]))
+		}));
 
 	const sos = sosButtons(event, plans);
 	return [
