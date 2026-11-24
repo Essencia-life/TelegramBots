@@ -96,12 +96,12 @@ function descriptionLines(description: string) {
 	return description
 		.replaceAll(/<(br|\/li|\/ul)>/g, '\n')
 		.replaceAll('<li>', '• ')
-		.replaceAll(/<[^>]+>/g, '')
 		.replaceAll('&nbsp;', ' ')
 		.replaceAll('&lt;', '<')
 		.replaceAll('&gt;', '>')
 		.replaceAll('&quot;', '"')
 		.replaceAll('&amp;', '&')
+		.replaceAll(/<[^>]+>/g, '')
 		.split('\n')
 		.map((line) => line.trim())
 		.filter(Boolean);
