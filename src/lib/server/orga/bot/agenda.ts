@@ -121,14 +121,18 @@ function wrap({ tag, url, children }: Frame): RichText {
 	return tag in inlineTypes ? { type: inlineTypes[tag], text: children } : children;
 }
 
+type DescriptionLine = { content: RichText[]; list?: { id: number; ordered: boolean } };
+
 /**
- * Google descriptions are HTML: bold, italic, underline, strikethrough and links are kept, lists and line breaks become
- * lines, other tags are dropped. Every line is a RichText.
+ * Google descriptions are HTML: bold, italic, underline, strikethrough and links are kept, line breaks become lines,
+ * list items are marked with their list, other tags are dropped.
  */
-export function descriptionLines(description: string): RichText[] {
+export function descriptionLines(description: string): DescriptionLine[] {
 	const stack: Frame[] = [{ tag: '', children: [] }];
-	const lists: { ordered: boolean; n: number }[] = [];
-	const lines: RichText[] = [];
+	const lists: { id: number; ordered: boolean }[] = [];
+	let listCount = 0;
+	let item: DescriptionLine['list'];
+	const lines: DescriptionLine[] = [];
 
 	const endLine = () => {
 		// open formatting is closed and reopened, so a line break inside <b> keeps both lines bold
@@ -140,7 +144,7 @@ export function descriptionLines(description: string): RichText[] {
 		if (typeof children.at(-1) === 'string') children[children.length - 1] = (children.at(-1) as string).trimEnd();
 
 		const content = children.filter((child) => child !== '');
-		if (content.length) lines.push(content);
+		if (content.length) lines.push({ content, list: item });
 	};
 
 	for (const [token] of description.matchAll(/<\/?[a-z][^>]*>|<|[^<]+/gi)) {
@@ -156,6 +160,7 @@ export function descriptionLines(description: string): RichText[] {
 		if (lineBreakTags.has(tag)) endLine();
 
 		if (closing) {
+			if (tag === 'li') item = undefined;
 			if (tag === 'ul' || tag === 'ol') lists.pop();
 			const open = stack.findLastIndex((frame) => frame.tag === tag);
 			// formatting tags that were never closed or closed out of order are ignored
@@ -164,10 +169,9 @@ export function descriptionLines(description: string): RichText[] {
 				stack.length = open;
 			}
 		} else if (tag === 'ul' || tag === 'ol') {
-			lists.push({ ordered: tag === 'ol', n: 0 });
+			lists.push({ id: ++listCount, ordered: tag === 'ol' });
 		} else if (tag === 'li') {
-			const list = lists.at(-1);
-			stack.at(-1)!.children.push(list?.ordered ? `${++list.n}. ` : '• ');
+			item = lists.at(-1);
 		} else if (tag === 'a') {
 			const href = decodeEntities(token.match(/href\s*=\s*(?:"([^"]*)"|'([^']*)')/i)?.slice(1).find(Boolean) ?? '');
 			stack.push({ tag, url: /^(https?:|mailto:|tel:)/i.test(href) ? href : undefined, children: [] });
@@ -178,6 +182,48 @@ export function descriptionLines(description: string): RichText[] {
 
 	endLine();
 	return lines;
+}
+
+/** lines of the description as blocks: consecutive lines form a paragraph, list items form a list */
+function descriptionBlocks(description: string): InputRichBlock[] {
+	const blocks: InputRichBlock[] = [];
+	let paragraph: RichText[] = [];
+	let listId: number | undefined;
+
+	const endParagraph = () => {
+		if (paragraph.length) blocks.push({ type: 'paragraph', text: joinLines(paragraph) });
+		paragraph = [];
+	};
+
+	for (const { content, list } of descriptionLines(description)) {
+		if (!list) {
+			listId = undefined;
+			paragraph.push(content);
+			continue;
+		}
+
+		endParagraph();
+		const last = blocks.at(-1);
+		let listBlock = listId === list.id && last?.type === 'list' ? last : undefined;
+		if (!listBlock) {
+			listBlock = { type: 'list', items: [] };
+			blocks.push(listBlock);
+			listId = list.id;
+		}
+
+		listBlock.items.push({
+			blocks: [{ type: 'paragraph', text: content }],
+			...(list.ordered && { type: '1' as const, value: listBlock.items.length + 1 })
+		});
+	}
+
+	endParagraph();
+	return blocks;
+}
+
+/** lines below each other inside one paragraph */
+function joinLines(lines: RichText[]): RichText[] {
+	return lines.flatMap((line, i) => (i ? ['\n', line] : [line]));
 }
 
 /**
@@ -290,14 +336,11 @@ function eventBlocks(event: CalendarEvent, plans: Plans): InputRichBlock[] {
 	const blocks: InputRichBlock[] = [
 		firstLine.length ? [firstLine] : [],
 		[secondLine],
-		jobLines(entry?.planEvent, entry?.plan),
-		descriptionLines(event.description ?? '')
+		jobLines(entry?.planEvent, entry?.plan)
 	]
 		.filter((lines) => lines.length)
-		.map((lines): InputRichBlock => ({
-			type: 'paragraph',
-			text: lines.flatMap((line, i) => (i ? ['\n', line] : [line]))
-		}));
+		.map((lines): InputRichBlock => ({ type: 'paragraph', text: joinLines(lines) }));
+	blocks.push(...descriptionBlocks(event.description ?? ''));
 
 	const sos = sosButtons(event, plans);
 	return [
