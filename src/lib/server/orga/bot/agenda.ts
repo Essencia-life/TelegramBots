@@ -304,22 +304,47 @@ function people(persons: TelegramUser[]): RichText[] {
 	});
 }
 
-/** one entry per line, the lines of a job with details follow directly */
-function jobLines(planEvent: PlanEvent | undefined, plan: Plan | undefined): RichText[] {
-	const lines: RichText[] = [];
+/** a job of an event with the people who signed up */
+interface JobSlot {
+	key: string;
+	title: string;
+	persons: TelegramUser[];
+	details?: string;
+}
 
-	for (const { key, title } of planEvent?.jobs ?? []) {
-		const { persons = [], details } = plan?.[key] ?? {};
-		if (!details) {
-			lines.push([`${title}: `, ...people(persons)]);
-		} else {
-			const [firstLine, ...rest] = details.split('\n');
-			lines.push([`${title}: ${firstLine} with `, ...people(persons)]);
-			lines.push(...rest.filter(Boolean));
-		}
-	}
+/** Renders the jobs of an event as lines; chosen per event with the private extended property `agendaTemplate`. */
+type JobsTemplate = (jobs: JobSlot[]) => RichText[];
 
-	return lines;
+/** one line per job, the lines of a job with details follow directly */
+const defaultJobs: JobsTemplate = (jobs) =>
+	jobs.flatMap(({ title, persons, details }): RichText[] => {
+		if (!details) return [[`${title}: `, ...people(persons)]];
+
+		const [firstLine, ...rest] = details.split('\n');
+		return [[`${title}: ${firstLine} with `, ...people(persons)], ...rest.filter(Boolean)];
+	});
+
+/** all the jobs of the template in one line: an emoji and the people per job, jobs that the event does not have are left out */
+const emojiLine =
+	(emojis: Record<string, string>): JobsTemplate =>
+	(jobs) => {
+		const parts = jobs.flatMap(({ key, persons }) => (key in emojis ? [[`${emojis[key]} `, ...people(persons)]] : []));
+		return parts.length ? [parts.flatMap((part, i): RichText[] => (i ? ['  ', part] : [part]))] : [];
+	};
+
+const jobsTemplates: Record<string, JobsTemplate> = {
+	default: defaultJobs,
+	lunch: emojiLine({ chef: '👨‍🍳', cleaning: '🧽' })
+};
+
+function jobLines(event: CalendarEvent, planEvent: PlanEvent | undefined, plan: Plan | undefined): RichText[] {
+	const jobs = (planEvent?.jobs ?? []).map(
+		({ key, title }): JobSlot => ({ key, title, persons: plan?.[key]?.persons ?? [], details: plan?.[key]?.details })
+	);
+	const name = event.extendedProperties?.private?.agendaTemplate;
+	const template = (name && Object.hasOwn(jobsTemplates, name) ? jobsTemplates[name] : undefined) ?? defaultJobs;
+
+	return template(jobs);
 }
 
 /** small blank line between the heading, the events and the footer (a footer block is smaller than a paragraph) */
@@ -356,7 +381,7 @@ function eventBlocks(event: CalendarEvent, plans: Plans): InputRichBlock[] {
 	const blocks: InputRichBlock[] = [
 		firstLine.length ? [firstLine] : [],
 		[secondLine],
-		jobLines(entry?.planEvent, entry?.plan)
+		jobLines(event, entry?.planEvent, entry?.plan)
 	]
 		.filter((lines) => lines.length)
 		.map((lines): InputRichBlock => ({ type: 'paragraph', text: joinLines(lines) }));
