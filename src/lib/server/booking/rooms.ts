@@ -1,0 +1,38 @@
+import { z } from 'zod';
+import { BOOKING_ROOMS } from '$env/static/private';
+
+const roomSchema = z.object({
+	name: z.string().min(1),
+	/** resource calendar of the room */
+	calendarId: z.string().min(1),
+	/** forum topic of the room in the home group, where its agenda is posted */
+	topicId: z.number().int().positive()
+});
+
+/** `BOOKING_ROOMS='{"hive":{"name":"Hive","calendarId":"…","topicId":123}}'`, the keys are the slugs of the web app paths */
+export const roomsSchema = z
+	.record(z.string().regex(/^[a-z0-9-]+$/), roomSchema)
+	.refine((rooms) => Object.keys(rooms).length > 0, 'At least one room is required');
+
+export type Room = z.infer<typeof roomSchema> & { slug: string };
+
+export function parseRooms(json: string): Room[] {
+	return Object.entries(roomsSchema.parse(JSON.parse(json))).map(([slug, room]) => ({
+		slug,
+		...room
+	}));
+}
+
+export const rooms = parseRooms(BOOKING_ROOMS);
+
+/** the first room, for everything that has no room in its context */
+export const defaultRoom = rooms[0];
+
+export const getRoom = (slug: string | undefined) => rooms.find((room) => room.slug === slug);
+
+export const getRoomByTopic = (topicId: number | undefined) =>
+	rooms.find((room) => room.topicId === topicId);
+
+/** bookings made before rooms existed have no room property: they were all made for the Hive */
+export const roomOf = (event: { extendedProperties?: { shared?: Record<string, string> | null } | null }) =>
+	getRoom(event.extendedProperties?.shared?.room ?? 'hive');

@@ -18,7 +18,7 @@
 			"schedule": "0 4 * * *"
 		},
 		{
-			"path": "/hive/api/telegram/agenda",
+			"path": "/booking/api/telegram/agenda",
 			"schedule": "0 5 * * *"
 		}
 	]

@@ -2,8 +2,9 @@
 // import { bot as hiveBot } from '$lib/server/hive/bot';
 // import { bot as shoppingBot } from '$lib/server/shopping/bot';
 // import { bot as orgaBot } from '$lib/server/orga/bot';
+// import { bot as bookingBot } from '$lib/server/booking/bot';
 // import { startDevServer } from '$lib/server/bot-utils';
 //
 // if (dev) {
-// 	startDevServer(orgaBot);
+// 	startDevServer(bookingBot);
 // }
