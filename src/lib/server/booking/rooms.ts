@@ -6,10 +6,12 @@ const roomSchema = z.object({
 	/** resource calendar of the room */
 	calendarId: z.string().min(1),
 	/** forum topic of the room in the home group, where its agenda is posted */
-	topicId: z.number().int().positive()
+	topicId: z.number().int().positive(),
+	/** shown in the booking message and as thumbnail of the inline result, the calendar if not set */
+	emoji: z.emoji().optional()
 });
 
-/** `BOOKING_ROOMS='{"hive":{"name":"Hive","calendarId":"…","topicId":123}}'`, the keys are the slugs of the web app paths */
+/** `BOOKING_ROOMS='{"hive":{"name":"Hive","calendarId":"…","topicId":123,"emoji":"💻"}}'` (emoji is optional), the keys are the slugs of the web app paths */
 export const roomsSchema = z
 	.record(z.string().regex(/^[a-z0-9-]+$/), roomSchema)
 	.refine((rooms) => Object.keys(rooms).length > 0, 'At least one room is required');
@@ -45,3 +47,18 @@ const roomForms: Record<string, { reasonPlaceholder: string; privacy: boolean }>
 
 export const getRoomForm = (slug: string) =>
 	roomForms[slug] ?? { reasonPlaceholder: 'e.g. Meeting', privacy: false };
+
+const defaultEmoji = '🗓️';
+
+export const roomEmoji = (room?: Room) => room?.emoji ?? defaultEmoji;
+
+/** emojiapi.dev image of an emoji, addressed by its hex code, e.g. as thumbnail of an inline result. */
+export function emojiImageUrl(emoji: string, size = 96) {
+	const hex = [...emoji]
+		.map((char) => char.codePointAt(0)!.toString(16))
+		// the variation selector is no part of the code
+		.filter((code) => code !== 'fe0f')
+		.join('-');
+
+	return `https://emojiapi.dev/api/v1/${hex}/${size}.png`;
+}

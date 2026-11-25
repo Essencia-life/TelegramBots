@@ -9,7 +9,15 @@ import { Bot, GrammyError, InlineKeyboard, InlineQueryResultBuilder } from 'gram
 import { DateTime } from 'luxon';
 import { Calendar, type CalendarEvent } from '../calendar';
 import { escapeHtml, generateAgenda, timeZone } from './agenda';
-import { defaultRoom, getRoom, getRoomByTopic, roomOf, type Room } from './rooms';
+import {
+	defaultRoom,
+	emojiImageUrl,
+	getRoom,
+	getRoomByTopic,
+	roomEmoji,
+	roomOf,
+	type Room
+} from './rooms';
 import { redis } from '$lib/server/redis';
 import { errorHandlerCallback } from '$lib/server/bot-utils';
 
@@ -101,10 +109,11 @@ function generateBookingMessage(booking: CalendarEvent, deleted = false) {
 	const privacy = isPrivate
 		? `\n\n<i>${isPrivate === 'true' ? '🔒 Please respect the privacy and do not disturb.' : '🤫 Silent co-working is accepted'}</i>`
 		: '';
-	const roomName = roomOf(booking)?.name ?? 'a room';
+	const room = roomOf(booking);
+	const roomName = room?.name ?? 'a room';
 
 	return strikethrough(
-		`💻 I booked ${escapeHtml(roomName)} for ${escapeHtml(booking.description ?? '')}\n\non ${tgTime(startDate, time)}${privacy}`
+		`${roomEmoji(room)} I booked ${escapeHtml(roomName)} for ${escapeHtml(booking.description ?? '')}\n\non ${tgTime(startDate, time)}${privacy}`
 	);
 }
 
@@ -183,7 +192,7 @@ function createInlineQueryArticlesFromBookings(bookings: CalendarEvent[]) {
 
 		return InlineQueryResultBuilder.article(booking.id!, title, {
 			description: `${room.name}: click here to post your booking to this chat.`,
-			thumbnail_url: 'https://emojiapi.dev/api/v1/laptop/96.png',
+			thumbnail_url: emojiImageUrl(roomEmoji(room)),
 			thumbnail_height: 96,
 			thumbnail_width: 96,
 			reply_markup: new InlineKeyboard().add(openBookingsButton(room))
