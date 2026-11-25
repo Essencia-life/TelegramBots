@@ -96,14 +96,15 @@ function generateBookingMessage(booking: CalendarEvent, deleted = false) {
 		})
 		.replaceAll('/', '.')}\n${hours(startDate)} – ${hours(endDate)}`;
 
-	const isPrivate = booking.extendedProperties?.shared?.isPrivate === 'true';
+	// rooms without a privacy setting do not store one: nothing is shown then
+	const isPrivate = booking.extendedProperties?.shared?.isPrivate;
 	const privacy = isPrivate
-		? '🔒 Please respect the privacy and do not disturb.'
-		: '🤫 Silent co-working is accepted';
+		? `\n\n<i>${isPrivate === 'true' ? '🔒 Please respect the privacy and do not disturb.' : '🤫 Silent co-working is accepted'}</i>`
+		: '';
 	const roomName = roomOf(booking)?.name ?? 'a room';
 
 	return strikethrough(
-		`💻 I booked ${escapeHtml(roomName)} for ${escapeHtml(booking.description ?? '')}\n\non ${tgTime(startDate, time)}\n\n<i>${privacy}</i>`
+		`💻 I booked ${escapeHtml(roomName)} for ${escapeHtml(booking.description ?? '')}\n\non ${tgTime(startDate, time)}${privacy}`
 	);
 }
 
