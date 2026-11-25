@@ -20,10 +20,6 @@
 		{
 			"path": "/booking/api/telegram/agenda",
 			"schedule": "0 5 * * *"
-		},
-		{
-			"path": "/hive/api/telegram/agenda",
-			"schedule": "0 5 * * *"
 		}
 	]
 }
