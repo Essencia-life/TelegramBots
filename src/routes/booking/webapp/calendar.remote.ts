@@ -7,7 +7,7 @@ import { Calendar } from '$lib/server/calendar';
 import { getRoom, roomOf } from '$lib/server/booking/rooms';
 import { timeZone } from '$lib/server/booking/agenda';
 import { updateAgenda, updateInlineMessage } from '$lib/server/booking/bot';
-import { CO_WORKING_CALENDAR_ID, BOOKING_BOT_TOKEN } from '$env/static/private';
+import { BOOKING_CALENDAR_ID, BOOKING_BOT_TOKEN } from '$env/static/private';
 
 /** Slug of a configured room, resolved to the room itself. */
 const roomSchema = z
@@ -31,7 +31,7 @@ const bookingFields = z.object({
 async function getOwnBooking(id: string) {
 	const { user } = getSession(BOOKING_BOT_TOKEN);
 
-	const booking = await new Calendar(CO_WORKING_CALENDAR_ID).getEvent(id);
+	const booking = await new Calendar(BOOKING_CALENDAR_ID).getEvent(id);
 	if (!booking) return error(404, 'Booking not found');
 
 	if (booking.extendedProperties?.shared?.telegramUserId !== String(user.id)) {
@@ -71,7 +71,7 @@ export const checkAvailability = command(
 		const roomCalendar = new Calendar(room.calendarId);
 		if (!excludeId) return roomCalendar.getFreeBusy(startDate, endDate);
 
-		const own = await new Calendar(CO_WORKING_CALENDAR_ID).getEvent(excludeId);
+		const own = await new Calendar(BOOKING_CALENDAR_ID).getEvent(excludeId);
 		return roomCalendar.getBusyExcept(startDate, endDate, own?.iCalUID);
 	}
 );
@@ -81,7 +81,7 @@ export const createBooking = command(
 	async ({ room, startDate, endDate, description, isPrivate }) => {
 		const { user } = getSession(BOOKING_BOT_TOKEN);
 
-		const res = await new Calendar(CO_WORKING_CALENDAR_ID).insertEvent({
+		const res = await new Calendar(BOOKING_CALENDAR_ID).insertEvent({
 			summary: user.first_name,
 			description,
 			start: { dateTime: startDate, timeZone },
@@ -109,7 +109,7 @@ export const deleteBooking = command(z.string(), async (id) => {
 
 	const telegramInlineMessageId = booking.extendedProperties?.private?.telegramInlineMessageId;
 
-	await new Calendar(CO_WORKING_CALENDAR_ID).deleteEvent(id);
+	await new Calendar(BOOKING_CALENDAR_ID).deleteEvent(id);
 
 	if (telegramInlineMessageId) {
 		await updateInlineMessage(telegramInlineMessageId, booking, true);
@@ -136,7 +136,7 @@ export const updateBooking = command(
 			return error(404, 'Booking not found');
 		}
 
-		const res = await new Calendar(CO_WORKING_CALENDAR_ID).updateEvent(id, {
+		const res = await new Calendar(BOOKING_CALENDAR_ID).updateEvent(id, {
 			description,
 			start: { dateTime: startDate, timeZone },
 			end: { dateTime: endDate, timeZone },

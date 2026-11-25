@@ -2,7 +2,7 @@ import {
 	BOT_ADMIN_CHAT_ID,
 	BOT_HOME_GROUP_CHAT_ID,
 	BOOKING_BOT_TOKEN,
-	CO_WORKING_CALENDAR_ID,
+	BOOKING_CALENDAR_ID,
 	VERCEL_ENV
 } from '$env/static/private';
 import { Bot, GrammyError, InlineKeyboard, InlineQueryResultBuilder } from 'grammy';
@@ -29,7 +29,7 @@ bot.on('my_chat_member', async (ctx) => {
 });
 
 bot.on('inline_query', async (ctx) => {
-	const coWorkingCalendar = new Calendar(CO_WORKING_CALENDAR_ID);
+	const coWorkingCalendar = new Calendar(BOOKING_CALENDAR_ID);
 
 	if (ctx.inlineQuery.query !== '') {
 		const id = ctx.inlineQuery.query.trim();
@@ -45,7 +45,10 @@ bot.on('inline_query', async (ctx) => {
 		}
 	}
 
-	const myBookings = await coWorkingCalendar.getEvents([`telegramUserId=${ctx.from.id}`], new Date());
+	const myBookings = await coWorkingCalendar.getEvents(
+		[`telegramUserId=${ctx.from.id}`],
+		new Date()
+	);
 
 	return ctx.answerInlineQuery(createInlineQueryArticlesFromBookings(myBookings), {
 		cache_time: 0,
@@ -76,7 +79,12 @@ function generateBookingMessage(booking: CalendarEvent, deleted = false) {
 		deleted ? text : `<tg-time unix="${date.getTime() / 1000}">${text}</tg-time>`;
 	const strikethrough = (text: string) => (deleted ? `<s>${text}</s>` : text);
 	const hours = (date: Date) =>
-		date.toLocaleTimeString('en-gb', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone });
+		date.toLocaleTimeString('en-gb', {
+			hour: '2-digit',
+			minute: '2-digit',
+			hour12: false,
+			timeZone
+		});
 
 	const time = `${startDate
 		.toLocaleDateString('en-gb', {
@@ -149,7 +157,8 @@ export async function refreshAgenda(room: Room) {
 		});
 	} catch (err) {
 		// the resource calendar is delayed, so the text can still be the same as before: Telegram answers 400
-		if (!(err instanceof GrammyError) || !/message is not modified/i.test(err.description)) throw err;
+		if (!(err instanceof GrammyError) || !/message is not modified/i.test(err.description))
+			throw err;
 	}
 }
 
@@ -182,7 +191,7 @@ function createInlineQueryArticlesFromBookings(bookings: CalendarEvent[]) {
 }
 
 bot.on('chosen_inline_result', async (ctx) => {
-	await new Calendar(CO_WORKING_CALENDAR_ID).updateEvent(ctx.chosenInlineResult.result_id, {
+	await new Calendar(BOOKING_CALENDAR_ID).updateEvent(ctx.chosenInlineResult.result_id, {
 		extendedProperties: {
 			private: {
 				telegramInlineMessageId: String(ctx.chosenInlineResult.inline_message_id)
