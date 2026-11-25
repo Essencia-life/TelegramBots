@@ -52,13 +52,13 @@ const defaultEmoji = '🗓️';
 
 export const roomEmoji = (room?: Room) => room?.emoji ?? defaultEmoji;
 
-/** Twemoji image of an emoji, e.g. as thumbnail of an inline result. */
-export function emojiImageUrl(emoji: string, size: 72 | 'svg' = 72) {
-	const codePoints = [...emoji].map((char) => char.codePointAt(0)!.toString(16));
-	// like twemoji: the variation selector is only in the file name of sequences with a joiner
-	const name = (codePoints.includes('200d') ? codePoints : codePoints.filter((c) => c !== 'fe0f')).join('-');
+/** emojiapi.dev image of an emoji, addressed by its hex code, e.g. as thumbnail of an inline result. */
+export function emojiImageUrl(emoji: string, size = 96) {
+	const hex = [...emoji]
+		.map((char) => char.codePointAt(0)!.toString(16))
+		// the variation selector is no part of the code
+		.filter((code) => code !== 'fe0f')
+		.join('-');
 
-	return size === 'svg'
-		? `https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/svg/${name}.svg`
-		: `https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/${size}x${size}/${name}.png`;
+	return `https://emojiapi.dev/api/v1/${hex}/${size}.png`;
 }

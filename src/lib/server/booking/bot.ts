@@ -193,8 +193,8 @@ function createInlineQueryArticlesFromBookings(bookings: CalendarEvent[]) {
 		return InlineQueryResultBuilder.article(booking.id!, title, {
 			description: `${room.name}: click here to post your booking to this chat.`,
 			thumbnail_url: emojiImageUrl(roomEmoji(room)),
-			thumbnail_height: 72,
-			thumbnail_width: 72,
+			thumbnail_height: 96,
+			thumbnail_width: 96,
 			reply_markup: new InlineKeyboard().add(openBookingsButton(room))
 		}).text(generateBookingMessage(booking), { parse_mode: 'HTML' });
 	});
