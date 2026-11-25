@@ -36,3 +36,12 @@ export const getRoomByTopic = (topicId: number | undefined) =>
 /** bookings made before rooms existed have no room property: they were all made for the Hive */
 export const roomOf = (event: { extendedProperties?: { shared?: Record<string, string> | null } | null }) =>
 	getRoom(event.extendedProperties?.shared?.room ?? 'hive');
+
+/** what the booking form of a room offers; rooms without an entry get the defaults */
+const roomForms: Record<string, { reasonPlaceholder: string; privacy: boolean }> = {
+	hive: { reasonPlaceholder: 'e.g. Private Call', privacy: true },
+	'community-yurt': { reasonPlaceholder: 'e.g. Healing Session', privacy: false }
+};
+
+export const getRoomForm = (slug: string) =>
+	roomForms[slug] ?? { reasonPlaceholder: 'e.g. Meeting', privacy: false };

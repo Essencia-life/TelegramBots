@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { query, command } from '$app/server';
 import { getSession } from '$lib/server/session';
 import { Calendar } from '$lib/server/calendar';
-import { getRoom, roomOf } from '$lib/server/booking/rooms';
+import { getRoom, getRoomForm, roomOf } from '$lib/server/booking/rooms';
 import { timeZone } from '$lib/server/booking/agenda';
 import { updateAgenda, updateInlineMessage } from '$lib/server/booking/bot';
 import { BOOKING_CALENDAR_ID, BOOKING_BOT_TOKEN } from '$env/static/private';
@@ -24,7 +24,8 @@ const timeRange = z
 
 const bookingFields = z.object({
 	description: z.string().max(1000),
-	isPrivate: z.boolean()
+	/** only rooms with a privacy setting use it */
+	isPrivate: z.boolean().optional()
 });
 
 /** Loads a booking and makes sure the logged-in user created it. */
@@ -90,7 +91,7 @@ export const createBooking = command(
 			extendedProperties: {
 				shared: {
 					telegramUserId: String(user.id),
-					isPrivate: String(isPrivate),
+					...(isPrivate !== undefined && getRoomForm(room.slug).privacy && { isPrivate: String(isPrivate) }),
 					room: room.slug
 				}
 			}
@@ -141,7 +142,7 @@ export const updateBooking = command(
 			start: { dateTime: startDate, timeZone },
 			end: { dateTime: endDate, timeZone },
 			extendedProperties: {
-				shared: { isPrivate: String(isPrivate) }
+				shared: isPrivate !== undefined && getRoomForm(room.slug).privacy ? { isPrivate: String(isPrivate) } : {}
 			}
 		});
 

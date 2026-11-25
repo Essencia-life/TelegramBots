@@ -33,14 +33,16 @@ function formatEvent(event: CalendarEvent) {
 			: '';
 
 	const isPersonalBooking = !!event.extendedProperties?.shared?.telegramUserId;
-	const isPrivate = event.extendedProperties?.shared?.isPrivate === 'true';
+	const privacy = event.extendedProperties?.shared?.isPrivate;
 	const description =
 		event.description && isPersonalBooking ? escapeHtml(event.description) : '';
-	const suffix = isPersonalBooking
-		? isPrivate
-			? '\n\n<i>🔒 Please respect the privacy and do not disturb.</i>'
-			: '\n\n<i>🤫 Silent co-working is accepted</i>'
-		: '';
+	// rooms without a privacy setting do not store one: nothing is shown then
+	const suffix =
+		isPersonalBooking && privacy
+			? privacy === 'true'
+				? '\n\n<i>🔒 Please respect the privacy and do not disturb.</i>'
+				: '\n\n<i>🤫 Silent co-working is accepted</i>'
+			: '';
 
 	return `<blockquote>${timeString}\n<b>${escapeHtml(event.summary ?? '')}</b> ${description}${suffix}</blockquote>`;
 }

@@ -72,7 +72,7 @@
 	let duration = $state(ms('30m'));
 
 	let loading = $state(false);
-	let isPrivate = $state(false);
+	let isPrivate = $state(data.booking?.extendedProperties?.shared?.isPrivate === 'true');
 
 	async function onsubmit(event: SubmitEvent) {
 		event.preventDefault();
@@ -102,7 +102,7 @@
 				startDate,
 				endDate,
 				description: description.trim(),
-				isPrivate
+				isPrivate: data.room.privacy ? isPrivate : undefined
 			});
 
 			loading = false;
@@ -113,7 +113,7 @@
 				startDate,
 				endDate,
 				description: description.trim(),
-				isPrivate
+				isPrivate: data.room.privacy ? isPrivate : undefined
 			});
 
 			loading = false;
@@ -243,17 +243,19 @@
 			required
 			bind:value={description}
 			autocapitalize="off"
-			placeholder="e.g. Private Call"
+			placeholder={data.room.reasonPlaceholder}
 			id="booking-reason"
 			class="col-span-2"
 		/>
 
-		<Toggle class="col-span-3" bind:checked={isPrivate}>
-			{#snippet offLabel()}
-				🤫 Silent co-working
-			{/snippet}
-			🔒 Private - do not disturb
-		</Toggle>
+		{#if data.room.privacy}
+			<Toggle class="col-span-3" bind:checked={isPrivate}>
+				{#snippet offLabel()}
+					🤫 Silent co-working
+				{/snippet}
+				🔒 Private - do not disturb
+			</Toggle>
+		{/if}
 	</form>
 
 	{#snippet footer()}

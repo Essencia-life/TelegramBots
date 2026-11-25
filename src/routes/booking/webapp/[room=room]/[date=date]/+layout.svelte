@@ -10,7 +10,7 @@
 	import { getBookings } from '../../calendar.remote';
 	import ms from 'ms';
 	import { swipe } from '$lib/attachments/swipe';
-	import { Button, ButtonGroup } from 'flowbite-svelte';
+	import { Button } from 'flowbite-svelte';
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import Plus from '@lucide/svelte/icons/plus';
@@ -128,6 +128,13 @@
 			});
 		}
 
+		// the room is chosen in the settings, it is preselected by the button the web app was opened with
+		if (data.rooms.length > 1) {
+			WebApp.SettingsButton?.show().onClick(() => {
+				void goto(resolve('/booking/webapp/[room=room]/[date=date]/settings', params));
+			});
+		}
+
 		WebApp.BackButton?.onClick(() => {
 			history.back();
 		});
@@ -138,6 +145,8 @@
 	});
 
 	onDestroy(() => {
+		WebApp.SettingsButton?.hide();
+
 		if (refreshIntervalInstance) {
 			window.clearInterval(refreshIntervalInstance);
 		}
@@ -165,22 +174,6 @@
 
 <!-- sticky holds within its parent only: the body is as high as the screen, so the calendar gets its own parent -->
 <div>
-	{#if data.rooms.length > 1}
-		<ButtonGroup class="mt-2 w-full">
-			{#each data.rooms as room (room.slug)}
-				<Button
-					class="flex-1"
-					color={room.slug === params.room ? 'primary' : 'light'}
-					href={resolve('/booking/webapp/[room=room]/[date=date]', {
-						room: room.slug,
-						date: params.date
-					})}
-				>
-					{room.name}
-				</Button>
-			{/each}
-		</ButtonGroup>
-	{/if}
 	<header
 		class="sticky top-0 z-10 mb-6 flex h-16 items-center justify-between bg-surface dark:bg-gray-900"
 	>
