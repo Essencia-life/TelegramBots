@@ -267,6 +267,14 @@ export class WeekPlanBot {
 					type: 'paragraph',
 					text
 				});
+
+				if (job.description) {
+					blocks.push({
+						type: 'details',
+						summary: 'ℹ️ About this job',
+						blocks: [{ type: 'paragraph', text: job.description }]
+					});
+				}
 			}
 		}
 
