@@ -1,7 +1,7 @@
 import * as z from 'zod';
 
 // Copy of the job format the Masterplan app writes into the event's private extended properties:
-// `jobs` (JSON array of Job) and `type` (stable event key). Keep both in sync.
+// `jobs` (JSON array of Job, at most 1024 characters in total: Google cuts longer values) and `type` (stable event key). Keep both in sync.
 // The length limits keep Telegram's 64 byte callback_data / deep link payload: "unassign:{type}:{yyyymmdd}:{key}".
 
 export const jobSchema = z.object({
@@ -9,7 +9,9 @@ export const jobSchema = z.object({
 	title: z.string().min(1),
 	slots: z.number().int().min(1).max(20),
 	askDetails: z.boolean().default(false),
-	sos: z.boolean().default(true)
+	sos: z.boolean().default(true),
+	/** short text, shown folded under the job in the week plan */
+	description: z.string().optional()
 });
 
 const jobsSchema = z.array(jobSchema).max(12);
