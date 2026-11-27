@@ -312,24 +312,53 @@ interface JobSlot {
 	details?: string;
 }
 
-/** Renders the jobs of an event as lines; chosen per event with the private extended property `agendaTemplate`. */
-type JobsTemplate = (jobs: JobSlot[]) => RichText[];
+/** Renders the jobs of an event as blocks; chosen per event with the private extended property `agendaTemplate`. */
+type JobsTemplate = (jobs: JobSlot[]) => InputRichBlock[];
 
-/** one line per job, the lines of a job with details follow directly */
-const defaultJobs: JobsTemplate = (jobs) =>
-	jobs.flatMap(({ title, persons, details }): RichText[] => {
-		if (!details) return [[`${title}: `, ...people(persons)]];
+/**
+ * One line per job. Details of the sign-up with more than one line are folded directly under the job: the first line is
+ * the summary, the others the content. A single line stays in the line of the job.
+ */
+const defaultJobs: JobsTemplate = (jobs) => {
+	const blocks: InputRichBlock[] = [];
+	let lines: RichText[] = [];
 
-		const [firstLine, ...rest] = details.split('\n');
-		return [[`${title}: ${firstLine} with `, ...people(persons)], ...rest.filter(Boolean)];
-	});
+	const endParagraph = () => {
+		if (lines.length) blocks.push({ type: 'paragraph', text: joinLines(lines) });
+		lines = [];
+	};
+
+	for (const { title, persons, details } of jobs) {
+		const [firstLine, ...rest] = (details ?? '').split('\n');
+		const more = rest.filter(Boolean);
+
+		if (!firstLine) {
+			lines.push([`${title}: `, ...people(persons)]);
+		} else if (!more.length) {
+			lines.push([`${title}: ${firstLine} with `, ...people(persons)]);
+		} else {
+			lines.push([`${title}: `, ...people(persons)]);
+			endParagraph();
+			blocks.push({
+				type: 'details',
+				summary: firstLine,
+				blocks: [{ type: 'paragraph', text: joinLines(more) }]
+			});
+		}
+	}
+
+	endParagraph();
+	return blocks;
+};
 
 /** all the jobs of the template in one line: an emoji and the people per job, jobs that the event does not have are left out */
 const emojiLine =
 	(emojis: Record<string, string>): JobsTemplate =>
 	(jobs) => {
 		const parts = jobs.flatMap(({ key, persons }) => (key in emojis ? [[`${emojis[key]} `, ...people(persons)]] : []));
-		return parts.length ? [parts.flatMap((part, i): RichText[] => (i ? ['  ', part] : [part]))] : [];
+		return parts.length
+			? [{ type: 'paragraph', text: parts.flatMap((part, i): RichText[] => (i ? ['  ', part] : [part])) }]
+			: [];
 	};
 
 const jobsTemplates: Record<string, JobsTemplate> = {
@@ -337,7 +366,7 @@ const jobsTemplates: Record<string, JobsTemplate> = {
 	lunch: emojiLine({ chef: '👨‍🍳', cleaning: '🧽' })
 };
 
-function jobLines(event: CalendarEvent, planEvent: PlanEvent | undefined, plan: Plan | undefined): RichText[] {
+function jobBlocks(event: CalendarEvent, planEvent: PlanEvent | undefined, plan: Plan | undefined): InputRichBlock[] {
 	const jobs = (planEvent?.jobs ?? []).map(
 		({ key, title }): JobSlot => ({ key, title, persons: plan?.[key]?.persons ?? [], details: plan?.[key]?.details })
 	);
@@ -378,14 +407,10 @@ function eventBlocks(event: CalendarEvent, plans: Plans): InputRichBlock[] {
 	const entry = plans.get(event.id!);
 
 	// a paragraph per group with line breaks inside: a paragraph per line would get the wide block spacing
-	const blocks: InputRichBlock[] = [
-		firstLine.length ? [firstLine] : [],
-		[secondLine],
-		jobLines(event, entry?.planEvent, entry?.plan)
-	]
+	const blocks: InputRichBlock[] = [firstLine.length ? [firstLine] : [], [secondLine]]
 		.filter((lines) => lines.length)
 		.map((lines): InputRichBlock => ({ type: 'paragraph', text: joinLines(lines) }));
-	blocks.push(...descriptionBlocks(event.description ?? ''));
+	blocks.push(...jobBlocks(event, entry?.planEvent, entry?.plan), ...descriptionBlocks(event.description ?? ''));
 
 	const sos = sosButtons(event, plans);
 	return [
