@@ -161,6 +161,8 @@ export class WeekPlanBot {
 			blocks.push(...this.buildEventBlocks(eventsByWeekday.get(weekday) ?? [], planMode));
 		}
 
+		blocks.push(...this.buildJobDescriptionBlocks(events));
+
 		blocks.push({
 			type: 'paragraph',
 			text: ''
@@ -190,6 +192,27 @@ export class WeekPlanBot {
 		});
 
 		return { blocks };
+	}
+
+	/** the folded descriptions of the jobs of the week: a job that comes back every day is explained once */
+	private buildJobDescriptionBlocks(events: PlannedEvent[]): InputRichBlock[] {
+		const descriptions = new Map<string, InputRichBlock>();
+
+		for (const { jobs } of events) {
+			for (const { title, description } of jobs) {
+				if (!description) continue;
+
+				descriptions.set(`${title}\n${description}`, {
+					type: 'details',
+					summary: `More about ${title}`,
+					blocks: [{ type: 'paragraph', text: description }]
+				});
+			}
+		}
+
+		if (!descriptions.size) return [];
+
+		return [{ type: 'heading', size: 2, text: 'About the jobs' }, ...descriptions.values()];
 	}
 
 	private buildEventBlocks(events: PlannedEvent[], planMode = false): InputRichBlock[] {
@@ -267,14 +290,6 @@ export class WeekPlanBot {
 					type: 'paragraph',
 					text
 				});
-
-				if (job.description) {
-					blocks.push({
-						type: 'details',
-						summary: 'ℹ️ About this job',
-						blocks: [{ type: 'paragraph', text: job.description }]
-					});
-				}
 			}
 		}
 
