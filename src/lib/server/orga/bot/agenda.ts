@@ -312,14 +312,32 @@ interface JobSlot {
 	details?: string;
 }
 
-/** Renders the jobs of an event as blocks; chosen per event with the private extended property `agendaTemplate`. */
-type JobsTemplate = (jobs: JobSlot[]) => InputRichBlock[];
+/** What a template makes of the jobs of an event: the blocks below its title and, if it wants, another title. */
+interface JobsRender {
+	title?: string;
+	blocks: InputRichBlock[];
+}
+
+/** Renders the jobs of an event; chosen with the private extended property `agendaTemplate` or by the key of the event. */
+type JobsTemplate = (jobs: JobSlot[]) => JobsRender;
+
+/** one line per job, the lines of the details follow directly */
+const plainJobs: JobsTemplate = (jobs) => {
+	const lines = jobs.flatMap(({ title, persons, details }): RichText[] => {
+		if (!details) return [[`${title}: `, ...people(persons)]];
+
+		const [firstLine, ...rest] = details.split('\n');
+		return [[`${title}: ${firstLine} with `, ...people(persons)], ...rest.filter(Boolean)];
+	});
+
+	return { blocks: lines.length ? [{ type: 'paragraph', text: joinLines(lines) }] : [] };
+};
 
 /**
  * One line per job. Details of the sign-up with more than one line are folded directly under the job: the first line is
  * the summary, the others the content. A single line stays in the line of the job.
  */
-const defaultJobs: JobsTemplate = (jobs) => {
+const withDetails: JobsTemplate = (jobs) => {
 	const blocks: InputRichBlock[] = [];
 	let lines: RichText[] = [];
 
@@ -348,30 +366,46 @@ const defaultJobs: JobsTemplate = (jobs) => {
 	}
 
 	endParagraph();
-	return blocks;
+	return { blocks };
 };
+
+/** `withDetails`, but for jobs that nobody has to do: without anybody signed up there is the fallback title and no jobs */
+const optionalWithDetails =
+	(fallbackTitle: string): JobsTemplate =>
+	(jobs) =>
+		jobs.some(({ persons }) => persons.length) ? withDetails(jobs) : { title: fallbackTitle, blocks: [] };
 
 /** all the jobs of the template in one line: an emoji and the people per job, jobs that the event does not have are left out */
 const emojiLine =
 	(emojis: Record<string, string>): JobsTemplate =>
 	(jobs) => {
 		const parts = jobs.flatMap(({ key, persons }) => (key in emojis ? [[`${emojis[key]} `, ...people(persons)]] : []));
-		return parts.length
-			? [{ type: 'paragraph', text: parts.flatMap((part, i): RichText[] => (i ? ['  ', part] : [part])) }]
-			: [];
+		return {
+			blocks: parts.length
+				? [{ type: 'paragraph', text: parts.flatMap((part, i): RichText[] => (i ? ['  ', part] : [part])) }]
+				: []
+		};
 	};
 
 const jobsTemplates: Record<string, JobsTemplate> = {
-	default: defaultJobs,
+	default: plainJobs,
+	withDetails,
+	optionalWithDetails: optionalWithDetails('Silent meditation'),
 	lunch: emojiLine({ chef: '👨‍🍳', cleaning: '🧽' })
 };
 
-function jobBlocks(event: CalendarEvent, planEvent: PlanEvent | undefined, plan: Plan | undefined): InputRichBlock[] {
+/** the template of events by their key (`type`), when the event has no `agendaTemplate` */
+const templateByType: Record<string, string> = {
+	'morning-practice': 'withDetails',
+	'guided-meditation': 'optionalWithDetails'
+};
+
+function renderJobs(event: CalendarEvent, planEvent: PlanEvent | undefined, plan: Plan | undefined): JobsRender {
 	const jobs = (planEvent?.jobs ?? []).map(
 		({ key, title }): JobSlot => ({ key, title, persons: plan?.[key]?.persons ?? [], details: plan?.[key]?.details })
 	);
-	const name = event.extendedProperties?.private?.agendaTemplate;
-	const template = (name && Object.hasOwn(jobsTemplates, name) ? jobsTemplates[name] : undefined) ?? defaultJobs;
+	const name = event.extendedProperties?.private?.agendaTemplate ?? (planEvent && templateByType[planEvent.type]);
+	const template = (name && Object.hasOwn(jobsTemplates, name) ? jobsTemplates[name] : undefined) ?? plainJobs;
 
 	return template(jobs);
 }
@@ -400,19 +434,21 @@ function eventBlocks(event: CalendarEvent, plans: Plans): InputRichBlock[] {
 		firstLine.push({ type: 'italic', text: `\uFE6B${parseLocation(event.location)}` });
 	}
 
-	const secondLine: RichText[] = [event.summary ?? ''];
+	const entry = plans.get(event.id!);
+	const jobs = renderJobs(event, entry?.planEvent, entry?.plan);
+
+	const secondLine: RichText[] = [jobs.title ?? event.summary ?? ''];
 	const duration = formatDuration(event);
 	if (duration) secondLine.push(` ${duration}`);
-
-	const entry = plans.get(event.id!);
 
 	// a paragraph per group with line breaks inside: a paragraph per line would get the wide block spacing
 	const blocks: InputRichBlock[] = [firstLine.length ? [firstLine] : [], [secondLine]]
 		.filter((lines) => lines.length)
 		.map((lines): InputRichBlock => ({ type: 'paragraph', text: joinLines(lines) }));
-	blocks.push(...jobBlocks(event, entry?.planEvent, entry?.plan), ...descriptionBlocks(event.description ?? ''));
+	blocks.push(...jobs.blocks, ...descriptionBlocks(event.description ?? ''));
 
-	const sos = sosButtons(event, plans);
+	// jobs that are not shown (optional ones) do not call for help
+	const sos = jobs.title ? [] : sosButtons(event, plans);
 	return [
 		// only events with a description have something to fold away
 		{ type: event.description?.trim() ? 'expandable_blockquote' : 'blockquote', blocks },
