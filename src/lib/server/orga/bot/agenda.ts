@@ -396,6 +396,7 @@ const jobsTemplates: Record<string, JobsTemplate> = {
 
 /** the template of events by their key (`type`), when the event has no `agendaTemplate` */
 const templateByType: Record<string, string> = {
+	lunch: 'lunch',
 	'morning-practice': 'withDetails',
 	'guided-meditation': 'optionalWithDetails'
 };
